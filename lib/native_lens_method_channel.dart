@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'native_lens_platform_interface.dart';
+import 'native_sensor.dart';
 import 'platform_summary.dart';
 import 'system_feature.dart';
 
@@ -47,5 +48,28 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return features;
+  }
+
+  @override
+  Future<List<NativeSensor>> getSensors() async {
+    final List<Object?>? sensorList = await methodChannel
+        .invokeListMethod<Object?>('getSensors');
+
+    if (sensorList == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_sensors',
+        message: 'Android returned an empty sensor list.',
+      );
+    }
+
+    final List<NativeSensor> sensors = <NativeSensor>[];
+
+    for (final Object? sensorItem in sensorList) {
+      if (sensorItem is Map<Object?, Object?>) {
+        sensors.add(NativeSensor.fromMap(sensorItem));
+      }
+    }
+
+    return sensors;
   }
 }

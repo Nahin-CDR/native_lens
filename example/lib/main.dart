@@ -19,6 +19,7 @@ class _MyAppState extends State<MyApp> {
   final _nativeLensPlugin = NativeLens();
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
+  List<NativeSensor>? _sensors;
   String? _errorMessage;
 
   @override
@@ -31,12 +32,14 @@ class _MyAppState extends State<MyApp> {
   Future<void> initPlatformState() async {
     PlatformSummary? platformSummary;
     List<SystemFeature>? systemFeatures;
+    List<NativeSensor>? sensors;
     String? errorMessage;
 
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       platformSummary = await _nativeLensPlugin.getPlatformSummary();
       systemFeatures = await _nativeLensPlugin.getSystemFeatures();
+      sensors = await _nativeLensPlugin.getSensors();
     } on PlatformException {
       errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
@@ -51,6 +54,7 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _platformSummary = platformSummary;
       _systemFeatures = systemFeatures;
+      _sensors = sensors;
       _errorMessage = errorMessage;
     });
   }
@@ -77,6 +81,7 @@ class _MyAppState extends State<MyApp> {
   Widget _buildBody() {
     final PlatformSummary? summary = _platformSummary;
     final List<SystemFeature>? features = _systemFeatures;
+    final List<NativeSensor>? sensors = _sensors;
 
     if (_errorMessage != null) {
       return Center(
@@ -88,7 +93,7 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    if (summary == null || features == null) {
+    if (summary == null || features == null || sensors == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -110,6 +115,12 @@ class _MyAppState extends State<MyApp> {
         const SizedBox(height: 12),
         for (final SystemFeature feature in features)
           _FeatureRow(feature: feature),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'Sensors'),
+        const SizedBox(height: 8),
+        Text('Total sensors: ${sensors.length}'),
+        const SizedBox(height: 12),
+        for (final NativeSensor sensor in sensors) _SensorRow(sensor: sensor),
       ],
     );
   }
@@ -167,6 +178,33 @@ class _FeatureRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Text('${feature.name}$versionText'),
+    );
+  }
+}
+
+class _SensorRow extends StatelessWidget {
+  const _SensorRow({required this.sensor});
+
+  final NativeSensor sensor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            sensor.name,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          Text('Type: ${sensor.typeName}'),
+          Text('Vendor: ${sensor.vendor}'),
+          Text('Power: ${sensor.power} mA'),
+          Text('Resolution: ${sensor.resolution}'),
+        ],
+      ),
     );
   }
 }

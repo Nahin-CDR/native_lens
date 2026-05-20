@@ -33,6 +33,25 @@ class MockNativeLensPlatform
       SystemFeature(name: 'OpenGL ES', version: 196608, isGlEsFeature: true),
     ]);
   }
+
+  @override
+  Future<List<NativeSensor>> getSensors() {
+    return Future<List<NativeSensor>>.value(const <NativeSensor>[
+      NativeSensor(
+        name: 'Pixel Accelerometer',
+        vendor: 'Google',
+        type: 1,
+        typeName: 'Accelerometer',
+        version: 1,
+        resolution: 0.01,
+        maximumRange: 39.2,
+        power: 0.12,
+        minDelay: 10000,
+        maxDelay: 1000000,
+        isWakeUpSensor: false,
+      ),
+    ]);
+  }
 }
 
 void main() {
@@ -64,5 +83,17 @@ void main() {
     expect(features.length, 2);
     expect(features.first.name, 'android.hardware.touchscreen');
     expect(features.last.isGlEsFeature, true);
+  });
+
+  test('getSensors', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final List<NativeSensor> sensors = await nativeLensPlugin.getSensors();
+
+    expect(sensors.length, 1);
+    expect(sensors.first.name, 'Pixel Accelerometer');
+    expect(sensors.first.typeName, 'Accelerometer');
   });
 }

@@ -31,4 +31,12 @@ void main() {
     expect(features.isNotEmpty, true);
     expect(features.first.name.isNotEmpty, true);
   });
+
+  testWidgets('getSensors test', (WidgetTester tester) async {
+    final NativeLens plugin = NativeLens();
+    final List<NativeSensor> sensors = await plugin.getSensors();
+
+    expect(sensors.isNotEmpty, true);
+    expect(sensors.first.name.isNotEmpty, true);
+  });
 }

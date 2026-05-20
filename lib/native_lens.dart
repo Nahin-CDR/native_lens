@@ -1,7 +1,9 @@
 import 'native_lens_platform_interface.dart';
+import 'native_sensor.dart';
 import 'platform_summary.dart';
 import 'system_feature.dart';
 
+export 'native_sensor.dart';
 export 'platform_summary.dart';
 export 'system_feature.dart';
 
@@ -15,5 +17,10 @@ class NativeLens {
   /// Returns the native Android system features reported by the device.
   Future<List<SystemFeature>> getSystemFeatures() {
     return NativeLensPlatform.instance.getSystemFeatures();
+  }
+
+  /// Returns the native Android sensors reported by the device.
+  Future<List<NativeSensor>> getSensors() {
+    return NativeLensPlatform.instance.getSensors();
   }
 }
