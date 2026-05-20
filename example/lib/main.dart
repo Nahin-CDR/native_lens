@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:native_lens/native_lens.dart';
 
@@ -18,6 +18,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final _nativeLensPlugin = NativeLens();
   PlatformSummary? _platformSummary;
+  List<SystemFeature>? _systemFeatures;
   String? _errorMessage;
 
   @override
@@ -29,13 +30,15 @@ class _MyAppState extends State<MyApp> {
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     PlatformSummary? platformSummary;
+    List<SystemFeature>? systemFeatures;
     String? errorMessage;
 
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       platformSummary = await _nativeLensPlugin.getPlatformSummary();
+      systemFeatures = await _nativeLensPlugin.getSystemFeatures();
     } on PlatformException {
-      errorMessage = 'Failed to get platform summary.';
+      errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
       errorMessage = 'NativeLens is not available on this platform.';
     }
@@ -47,6 +50,7 @@ class _MyAppState extends State<MyApp> {
 
     setState(() {
       _platformSummary = platformSummary;
+      _systemFeatures = systemFeatures;
       _errorMessage = errorMessage;
     });
   }
@@ -72,6 +76,7 @@ class _MyAppState extends State<MyApp> {
 
   Widget _buildBody() {
     final PlatformSummary? summary = _platformSummary;
+    final List<SystemFeature>? features = _systemFeatures;
 
     if (_errorMessage != null) {
       return Center(
@@ -83,16 +88,13 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    if (summary == null) {
+    if (summary == null || features == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
     return ListView(
       children: <Widget>[
-        Text(
-          'Platform Summary',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        _SectionTitle(title: 'Platform Summary'),
         const SizedBox(height: 16),
         _SummaryRow(label: 'Manufacturer', value: summary.manufacturer),
         _SummaryRow(label: 'Brand', value: summary.brand),
@@ -101,8 +103,26 @@ class _MyAppState extends State<MyApp> {
         _SummaryRow(label: 'Product', value: summary.product),
         _SummaryRow(label: 'Android SDK', value: summary.androidSdk.toString()),
         _SummaryRow(label: 'Android Release', value: summary.androidRelease),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'System Features'),
+        const SizedBox(height: 8),
+        Text('Total features: ${features.length}'),
+        const SizedBox(height: 12),
+        for (final SystemFeature feature in features)
+          _FeatureRow(feature: feature),
       ],
     );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(title, style: Theme.of(context).textTheme.headlineSmall);
   }
 }
 
@@ -129,6 +149,24 @@ class _SummaryRow extends StatelessWidget {
           Expanded(child: Text(value)),
         ],
       ),
+    );
+  }
+}
+
+class _FeatureRow extends StatelessWidget {
+  const _FeatureRow({required this.feature});
+
+  final SystemFeature feature;
+
+  @override
+  Widget build(BuildContext context) {
+    final String versionText = feature.version == null
+        ? ''
+        : '  Version ${feature.version}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Text('${feature.name}$versionText'),
     );
   }
 }

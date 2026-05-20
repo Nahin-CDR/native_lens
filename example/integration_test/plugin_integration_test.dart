@@ -23,4 +23,12 @@ void main() {
     expect(summary.model.isNotEmpty, true);
     expect(summary.androidSdk > 0, true);
   });
+
+  testWidgets('getSystemFeatures test', (WidgetTester tester) async {
+    final NativeLens plugin = NativeLens();
+    final List<SystemFeature> features = await plugin.getSystemFeatures();
+
+    expect(features.isNotEmpty, true);
+    expect(features.first.name.isNotEmpty, true);
+  });
 }

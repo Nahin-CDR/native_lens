@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'native_lens_platform_interface.dart';
 import 'platform_summary.dart';
+import 'system_feature.dart';
 
 /// An implementation of [NativeLensPlatform] that uses method channels.
 class MethodChannelNativeLens extends NativeLensPlatform {
@@ -23,5 +24,28 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return PlatformSummary.fromMap(summaryMap);
+  }
+
+  @override
+  Future<List<SystemFeature>> getSystemFeatures() async {
+    final List<Object?>? featureList = await methodChannel
+        .invokeListMethod<Object?>('getSystemFeatures');
+
+    if (featureList == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_features',
+        message: 'Android returned an empty system feature list.',
+      );
+    }
+
+    final List<SystemFeature> features = <SystemFeature>[];
+
+    for (final Object? featureItem in featureList) {
+      if (featureItem is Map<Object?, Object?>) {
+        features.add(SystemFeature.fromMap(featureItem));
+      }
+    }
+
+    return features;
   }
 }

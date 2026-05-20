@@ -21,6 +21,18 @@ class MockNativeLensPlatform
       ),
     );
   }
+
+  @override
+  Future<List<SystemFeature>> getSystemFeatures() {
+    return Future<List<SystemFeature>>.value(const <SystemFeature>[
+      SystemFeature(
+        name: 'android.hardware.touchscreen',
+        version: null,
+        isGlEsFeature: false,
+      ),
+      SystemFeature(name: 'OpenGL ES', version: 196608, isGlEsFeature: true),
+    ]);
+  }
 }
 
 void main() {
@@ -39,5 +51,18 @@ void main() {
 
     expect(summary.manufacturer, 'Google');
     expect(summary.androidSdk, 35);
+  });
+
+  test('getSystemFeatures', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final List<SystemFeature> features = await nativeLensPlugin
+        .getSystemFeatures();
+
+    expect(features.length, 2);
+    expect(features.first.name, 'android.hardware.touchscreen');
+    expect(features.last.isGlEsFeature, true);
   });
 }

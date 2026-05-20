@@ -2,6 +2,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'native_lens_method_channel.dart';
 import 'platform_summary.dart';
+import 'system_feature.dart';
 
 /// The platform interface for NativeLens implementations.
 abstract class NativeLensPlatform extends PlatformInterface {
@@ -28,5 +29,10 @@ abstract class NativeLensPlatform extends PlatformInterface {
   /// Returns a summary of the Android platform running the app.
   Future<PlatformSummary> getPlatformSummary() {
     throw UnimplementedError('getPlatformSummary() has not been implemented.');
+  }
+
+  /// Returns the native Android system features reported by the device.
+  Future<List<SystemFeature>> getSystemFeatures() {
+    throw UnimplementedError('getSystemFeatures() has not been implemented.');
   }
 }
