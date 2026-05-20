@@ -1,0 +1,32 @@
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+
+import 'native_lens_method_channel.dart';
+import 'platform_summary.dart';
+
+/// The platform interface for NativeLens implementations.
+abstract class NativeLensPlatform extends PlatformInterface {
+  /// Constructs a NativeLensPlatform.
+  NativeLensPlatform() : super(token: _token);
+
+  static final Object _token = Object();
+
+  static NativeLensPlatform _instance = MethodChannelNativeLens();
+
+  /// The default instance of [NativeLensPlatform] to use.
+  ///
+  /// Defaults to [MethodChannelNativeLens].
+  static NativeLensPlatform get instance => _instance;
+
+  /// Platform-specific implementations should set this with their own
+  /// platform-specific class that extends [NativeLensPlatform] when
+  /// they register themselves.
+  static set instance(NativeLensPlatform instance) {
+    PlatformInterface.verifyToken(instance, _token);
+    _instance = instance;
+  }
+
+  /// Returns a summary of the Android platform running the app.
+  Future<PlatformSummary> getPlatformSummary() {
+    throw UnimplementedError('getPlatformSummary() has not been implemented.');
+  }
+}
