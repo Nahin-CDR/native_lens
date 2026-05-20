@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'display_info.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
 import 'platform_summary.dart';
@@ -71,5 +72,20 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return sensors;
+  }
+
+  @override
+  Future<DisplayInfo> getDisplayInfo() async {
+    final Map<Object?, Object?>? displayMap = await methodChannel
+        .invokeMapMethod<Object?, Object?>('getDisplayInfo');
+
+    if (displayMap == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_display',
+        message: 'Android returned empty display information.',
+      );
+    }
+
+    return DisplayInfo.fromMap(displayMap);
   }
 }

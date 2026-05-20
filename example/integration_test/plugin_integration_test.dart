@@ -39,4 +39,12 @@ void main() {
     expect(sensors.isNotEmpty, true);
     expect(sensors.first.name.isNotEmpty, true);
   });
+
+  testWidgets('getDisplayInfo test', (WidgetTester tester) async {
+    final NativeLens plugin = NativeLens();
+    final DisplayInfo displayInfo = await plugin.getDisplayInfo();
+
+    expect(displayInfo.widthPixels > 0, true);
+    expect(displayInfo.heightPixels > 0, true);
+  });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:native_lens/display_info.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
 import 'package:native_lens/native_sensor.dart';
 import 'package:native_lens/platform_summary.dart';
@@ -45,6 +46,19 @@ void main() {
                 'isWakeUpSensor': false,
               },
             ];
+          }
+
+          if (methodCall.method == 'getDisplayInfo') {
+            return <String, Object>{
+              'widthPixels': 1080,
+              'heightPixels': 2400,
+              'density': 2.75,
+              'densityDpi': 440,
+              'refreshRate': 120.0,
+              'supportedRefreshRates': <double>[60.0, 90.0, 120.0],
+              'isHdrSupported': true,
+              'supportedHdrTypes': <String>['HDR10', 'HLG'],
+            };
           }
 
           return <String, Object>{
@@ -103,5 +117,18 @@ void main() {
     expect(sensors.first.minDelay, 10000);
     expect(sensors.first.maxDelay, 1000000);
     expect(sensors.first.isWakeUpSensor, false);
+  });
+
+  test('getDisplayInfo', () async {
+    final DisplayInfo displayInfo = await platform.getDisplayInfo();
+
+    expect(displayInfo.widthPixels, 1080);
+    expect(displayInfo.heightPixels, 2400);
+    expect(displayInfo.density, 2.75);
+    expect(displayInfo.densityDpi, 440);
+    expect(displayInfo.refreshRate, 120);
+    expect(displayInfo.supportedRefreshRates, <double>[60, 90, 120]);
+    expect(displayInfo.isHdrSupported, true);
+    expect(displayInfo.supportedHdrTypes, <String>['HDR10', 'HLG']);
   });
 }

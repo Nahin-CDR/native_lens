@@ -20,6 +20,7 @@ class _MyAppState extends State<MyApp> {
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
   List<NativeSensor>? _sensors;
+  DisplayInfo? _displayInfo;
   String? _errorMessage;
 
   @override
@@ -33,6 +34,7 @@ class _MyAppState extends State<MyApp> {
     PlatformSummary? platformSummary;
     List<SystemFeature>? systemFeatures;
     List<NativeSensor>? sensors;
+    DisplayInfo? displayInfo;
     String? errorMessage;
 
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -40,6 +42,7 @@ class _MyAppState extends State<MyApp> {
       platformSummary = await _nativeLensPlugin.getPlatformSummary();
       systemFeatures = await _nativeLensPlugin.getSystemFeatures();
       sensors = await _nativeLensPlugin.getSensors();
+      displayInfo = await _nativeLensPlugin.getDisplayInfo();
     } on PlatformException {
       errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
@@ -55,6 +58,7 @@ class _MyAppState extends State<MyApp> {
       _platformSummary = platformSummary;
       _systemFeatures = systemFeatures;
       _sensors = sensors;
+      _displayInfo = displayInfo;
       _errorMessage = errorMessage;
     });
   }
@@ -82,6 +86,7 @@ class _MyAppState extends State<MyApp> {
     final PlatformSummary? summary = _platformSummary;
     final List<SystemFeature>? features = _systemFeatures;
     final List<NativeSensor>? sensors = _sensors;
+    final DisplayInfo? displayInfo = _displayInfo;
 
     if (_errorMessage != null) {
       return Center(
@@ -93,7 +98,10 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    if (summary == null || features == null || sensors == null) {
+    if (summary == null ||
+        features == null ||
+        sensors == null ||
+        displayInfo == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -109,6 +117,34 @@ class _MyAppState extends State<MyApp> {
         _SummaryRow(label: 'Android SDK', value: summary.androidSdk.toString()),
         _SummaryRow(label: 'Android Release', value: summary.androidRelease),
         const SizedBox(height: 28),
+        _SectionTitle(title: 'Display'),
+        const SizedBox(height: 16),
+        _SummaryRow(
+          label: 'Resolution',
+          value: '${displayInfo.widthPixels} x ${displayInfo.heightPixels}',
+        ),
+        _SummaryRow(label: 'Density', value: displayInfo.density.toString()),
+        _SummaryRow(
+          label: 'Density DPI',
+          value: displayInfo.densityDpi.toString(),
+        ),
+        _SummaryRow(
+          label: 'Refresh Rate',
+          value: '${displayInfo.refreshRate} Hz',
+        ),
+        _SummaryRow(
+          label: 'Supported',
+          value: _formatRefreshRates(displayInfo.supportedRefreshRates),
+        ),
+        _SummaryRow(
+          label: 'HDR',
+          value: displayInfo.isHdrSupported ? 'Supported' : 'Not supported',
+        ),
+        _SummaryRow(
+          label: 'HDR Types',
+          value: _formatTextList(displayInfo.supportedHdrTypes),
+        ),
+        const SizedBox(height: 28),
         _SectionTitle(title: 'System Features'),
         const SizedBox(height: 8),
         Text('Total features: ${features.length}'),
@@ -123,6 +159,22 @@ class _MyAppState extends State<MyApp> {
         for (final NativeSensor sensor in sensors) _SensorRow(sensor: sensor),
       ],
     );
+  }
+
+  String _formatRefreshRates(List<double> refreshRates) {
+    if (refreshRates.isEmpty) {
+      return 'Unknown';
+    }
+
+    return refreshRates.map((double rate) => '$rate Hz').join(', ');
+  }
+
+  String _formatTextList(List<String> values) {
+    if (values.isEmpty) {
+      return 'None';
+    }
+
+    return values.join(', ');
   }
 }
 

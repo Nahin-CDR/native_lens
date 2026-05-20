@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.os.Build
+import android.util.DisplayMetrics
+import android.view.Display
+import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -21,16 +24,20 @@ class NativeLensPlugin :
     // This local reference serves to register the plugin with the Flutter Engine and unregister it
     // when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
+    private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
     private lateinit var sensorManager: SensorManager
+    private lateinit var windowManager: WindowManager
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "native_lens")
         channel.setMethodCallHandler(this)
-        packageManager = flutterPluginBinding.applicationContext.packageManager
+        applicationContext = flutterPluginBinding.applicationContext
+        packageManager = applicationContext.packageManager
         sensorManager =
-            flutterPluginBinding.applicationContext.getSystemService(Context.SENSOR_SERVICE)
-                as SensorManager
+            applicationContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        windowManager =
+            applicationContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     }
 
     override fun onMethodCall(
@@ -41,6 +48,7 @@ class NativeLensPlugin :
             "getPlatformSummary" -> result.success(getPlatformSummary())
             "getSystemFeatures" -> result.success(getSystemFeatures())
             "getSensors" -> result.success(getSensors())
+            "getDisplayInfo" -> result.success(getDisplayInfo())
             else -> result.notImplemented()
         }
     }
@@ -145,6 +153,83 @@ class NativeLensPlugin :
             Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT -> "Low Latency Offbody Detect"
             Sensor.TYPE_ACCELEROMETER_UNCALIBRATED -> "Accelerometer Uncalibrated"
             else -> "Unknown Type $type"
+        }
+    }
+
+    private fun getDisplayInfo(): Map<String, Any> {
+        val display = getCurrentDisplay()
+        val metrics = getDisplayMetrics(display)
+        val supportedHdrTypes = getSupportedHdrTypes(display)
+
+        return mapOf(
+            "widthPixels" to metrics.widthPixels,
+            "heightPixels" to metrics.heightPixels,
+            "density" to metrics.density.toDouble(),
+            "densityDpi" to metrics.densityDpi,
+            "refreshRate" to getRefreshRate(display),
+            "supportedRefreshRates" to getSupportedRefreshRates(display),
+            "isHdrSupported" to supportedHdrTypes.isNotEmpty(),
+            "supportedHdrTypes" to supportedHdrTypes
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getCurrentDisplay(): Display? {
+        return windowManager.defaultDisplay
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getDisplayMetrics(display: Display?): DisplayMetrics {
+        val metrics = DisplayMetrics()
+
+        if (display != null) {
+            display.getRealMetrics(metrics)
+            return metrics
+        }
+
+        return applicationContext.resources.displayMetrics
+    }
+
+    private fun getRefreshRate(display: Display?): Double {
+        if (display == null) {
+            return 0.0
+        }
+
+        return display.refreshRate.toDouble()
+    }
+
+    private fun getSupportedRefreshRates(display: Display?): List<Double> {
+        if (display == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            val refreshRate = getRefreshRate(display)
+            if (refreshRate > 0.0) {
+                return listOf(refreshRate)
+            }
+            return emptyList()
+        }
+
+        return display.supportedModes
+            .map { mode -> mode.refreshRate.toDouble() }
+            .distinct()
+            .sorted()
+    }
+
+    private fun getSupportedHdrTypes(display: Display?): List<String> {
+        if (display == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return emptyList()
+        }
+
+        return display.hdrCapabilities.supportedHdrTypes.map { hdrType ->
+            getHdrTypeName(hdrType)
+        }
+    }
+
+    private fun getHdrTypeName(hdrType: Int): String {
+        return when (hdrType) {
+            Display.HdrCapabilities.HDR_TYPE_DOLBY_VISION -> "Dolby Vision"
+            Display.HdrCapabilities.HDR_TYPE_HDR10 -> "HDR10"
+            Display.HdrCapabilities.HDR_TYPE_HLG -> "HLG"
+            Display.HdrCapabilities.HDR_TYPE_HDR10_PLUS -> "HDR10+"
+            else -> "Unknown HDR Type $hdrType"
         }
     }
 

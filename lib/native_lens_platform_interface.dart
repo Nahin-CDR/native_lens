@@ -1,5 +1,6 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'display_info.dart';
 import 'native_lens_method_channel.dart';
 import 'native_sensor.dart';
 import 'platform_summary.dart';
@@ -40,5 +41,10 @@ abstract class NativeLensPlatform extends PlatformInterface {
   /// Returns the native Android sensors reported by the device.
   Future<List<NativeSensor>> getSensors() {
     throw UnimplementedError('getSensors() has not been implemented.');
+  }
+
+  /// Returns native Android display capabilities for the active display.
+  Future<DisplayInfo> getDisplayInfo() {
+    throw UnimplementedError('getDisplayInfo() has not been implemented.');
   }
 }

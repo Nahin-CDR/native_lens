@@ -52,6 +52,22 @@ class MockNativeLensPlatform
       ),
     ]);
   }
+
+  @override
+  Future<DisplayInfo> getDisplayInfo() {
+    return Future<DisplayInfo>.value(
+      const DisplayInfo(
+        widthPixels: 1080,
+        heightPixels: 2400,
+        density: 2.75,
+        densityDpi: 440,
+        refreshRate: 120,
+        supportedRefreshRates: <double>[60, 90, 120],
+        isHdrSupported: true,
+        supportedHdrTypes: <String>['HDR10', 'HLG'],
+      ),
+    );
+  }
 }
 
 void main() {
@@ -95,5 +111,18 @@ void main() {
     expect(sensors.length, 1);
     expect(sensors.first.name, 'Pixel Accelerometer');
     expect(sensors.first.typeName, 'Accelerometer');
+  });
+
+  test('getDisplayInfo', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final DisplayInfo displayInfo = await nativeLensPlugin.getDisplayInfo();
+
+    expect(displayInfo.widthPixels, 1080);
+    expect(displayInfo.heightPixels, 2400);
+    expect(displayInfo.refreshRate, 120);
+    expect(displayInfo.isHdrSupported, true);
   });
 }
