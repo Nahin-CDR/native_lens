@@ -1,6 +1,7 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'display_info.dart';
+import 'media_codec_capability.dart';
 import 'native_lens_method_channel.dart';
 import 'native_sensor.dart';
 import 'platform_summary.dart';
@@ -46,5 +47,10 @@ abstract class NativeLensPlatform extends PlatformInterface {
   /// Returns native Android display capabilities for the active display.
   Future<DisplayInfo> getDisplayInfo() {
     throw UnimplementedError('getDisplayInfo() has not been implemented.');
+  }
+
+  /// Returns native Android media codec capabilities reported by the device.
+  Future<List<MediaCodecCapability>> getMediaCodecs() {
+    throw UnimplementedError('getMediaCodecs() has not been implemented.');
   }
 }

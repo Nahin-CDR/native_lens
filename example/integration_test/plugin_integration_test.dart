@@ -47,4 +47,12 @@ void main() {
     expect(displayInfo.widthPixels > 0, true);
     expect(displayInfo.heightPixels > 0, true);
   });
+
+  testWidgets('getMediaCodecs test', (WidgetTester tester) async {
+    final NativeLens plugin = NativeLens();
+    final List<MediaCodecCapability> codecs = await plugin.getMediaCodecs();
+
+    expect(codecs.isNotEmpty, true);
+    expect(codecs.first.name.isNotEmpty, true);
+  });
 }

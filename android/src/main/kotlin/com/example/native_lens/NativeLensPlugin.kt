@@ -5,6 +5,8 @@ import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
+import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.os.Build
 import android.util.DisplayMetrics
 import android.view.Display
@@ -49,6 +51,7 @@ class NativeLensPlugin :
             "getSystemFeatures" -> result.success(getSystemFeatures())
             "getSensors" -> result.success(getSensors())
             "getDisplayInfo" -> result.success(getDisplayInfo())
+            "getMediaCodecs" -> result.success(getMediaCodecs())
             else -> result.notImplemented()
         }
     }
@@ -231,6 +234,55 @@ class NativeLensPlugin :
             Display.HdrCapabilities.HDR_TYPE_HDR10_PLUS -> "HDR10+"
             else -> "Unknown HDR Type $hdrType"
         }
+    }
+
+    private fun getMediaCodecs(): List<Map<String, Any>> {
+        val codecInfos = MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos
+
+        return codecInfos.map { codecInfo ->
+            val supportedTypes = codecInfo.supportedTypes.toList()
+            val supportedVideoTypes = supportedTypes.filter { mimeType ->
+                mimeType.startsWith("video/")
+            }
+            val supportedAudioTypes = supportedTypes.filter { mimeType ->
+                mimeType.startsWith("audio/")
+            }
+
+            mapOf(
+                "name" to codecInfo.name,
+                "isEncoder" to codecInfo.isEncoder,
+                "supportedTypes" to supportedTypes,
+                "isHardwareAccelerated" to isCodecHardwareAccelerated(codecInfo),
+                "isSoftwareOnly" to isCodecSoftwareOnly(codecInfo),
+                "isVendor" to isCodecVendor(codecInfo),
+                "supportedVideoTypes" to supportedVideoTypes,
+                "supportedAudioTypes" to supportedAudioTypes
+            )
+        }
+    }
+
+    private fun isCodecHardwareAccelerated(codecInfo: MediaCodecInfo): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return false
+        }
+
+        return codecInfo.isHardwareAccelerated
+    }
+
+    private fun isCodecSoftwareOnly(codecInfo: MediaCodecInfo): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return false
+        }
+
+        return codecInfo.isSoftwareOnly
+    }
+
+    private fun isCodecVendor(codecInfo: MediaCodecInfo): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return false
+        }
+
+        return codecInfo.isVendor
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {

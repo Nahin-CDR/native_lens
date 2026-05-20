@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:native_lens/display_info.dart';
+import 'package:native_lens/media_codec_capability.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
 import 'package:native_lens/native_sensor.dart';
 import 'package:native_lens/platform_summary.dart';
@@ -59,6 +60,31 @@ void main() {
               'isHdrSupported': true,
               'supportedHdrTypes': <String>['HDR10', 'HLG'],
             };
+          }
+
+          if (methodCall.method == 'getMediaCodecs') {
+            return <Map<String, Object>>[
+              <String, Object>{
+                'name': 'c2.android.avc.decoder',
+                'isEncoder': false,
+                'supportedTypes': <String>['video/avc'],
+                'isHardwareAccelerated': false,
+                'isSoftwareOnly': true,
+                'isVendor': false,
+                'supportedVideoTypes': <String>['video/avc'],
+                'supportedAudioTypes': <String>[],
+              },
+              <String, Object>{
+                'name': 'c2.android.aac.encoder',
+                'isEncoder': true,
+                'supportedTypes': <String>['audio/mp4a-latm'],
+                'isHardwareAccelerated': false,
+                'isSoftwareOnly': true,
+                'isVendor': false,
+                'supportedVideoTypes': <String>[],
+                'supportedAudioTypes': <String>['audio/mp4a-latm'],
+              },
+            ];
           }
 
           return <String, Object>{
@@ -130,5 +156,22 @@ void main() {
     expect(displayInfo.supportedRefreshRates, <double>[60, 90, 120]);
     expect(displayInfo.isHdrSupported, true);
     expect(displayInfo.supportedHdrTypes, <String>['HDR10', 'HLG']);
+  });
+
+  test('getMediaCodecs', () async {
+    final List<MediaCodecCapability> codecs = await platform.getMediaCodecs();
+
+    expect(codecs.length, 2);
+    expect(codecs.first.name, 'c2.android.avc.decoder');
+    expect(codecs.first.isEncoder, false);
+    expect(codecs.first.supportedTypes, <String>['video/avc']);
+    expect(codecs.first.isHardwareAccelerated, false);
+    expect(codecs.first.isSoftwareOnly, true);
+    expect(codecs.first.isVendor, false);
+    expect(codecs.first.supportedVideoTypes, <String>['video/avc']);
+    expect(codecs.first.supportedAudioTypes, <String>[]);
+    expect(codecs.last.name, 'c2.android.aac.encoder');
+    expect(codecs.last.isEncoder, true);
+    expect(codecs.last.supportedAudioTypes, <String>['audio/mp4a-latm']);
   });
 }

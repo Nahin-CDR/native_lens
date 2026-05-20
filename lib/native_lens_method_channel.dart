@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'display_info.dart';
+import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
 import 'platform_summary.dart';
@@ -87,5 +88,28 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return DisplayInfo.fromMap(displayMap);
+  }
+
+  @override
+  Future<List<MediaCodecCapability>> getMediaCodecs() async {
+    final List<Object?>? codecList = await methodChannel
+        .invokeListMethod<Object?>('getMediaCodecs');
+
+    if (codecList == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_media_codecs',
+        message: 'Android returned an empty media codec list.',
+      );
+    }
+
+    final List<MediaCodecCapability> codecs = <MediaCodecCapability>[];
+
+    for (final Object? codecItem in codecList) {
+      if (codecItem is Map<Object?, Object?>) {
+        codecs.add(MediaCodecCapability.fromMap(codecItem));
+      }
+    }
+
+    return codecs;
   }
 }

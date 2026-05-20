@@ -68,6 +68,34 @@ class MockNativeLensPlatform
       ),
     );
   }
+
+  @override
+  Future<List<MediaCodecCapability>> getMediaCodecs() {
+    return Future<List<MediaCodecCapability>>.value(
+      const <MediaCodecCapability>[
+        MediaCodecCapability(
+          name: 'c2.android.avc.decoder',
+          isEncoder: false,
+          supportedTypes: <String>['video/avc'],
+          isHardwareAccelerated: false,
+          isSoftwareOnly: true,
+          isVendor: false,
+          supportedVideoTypes: <String>['video/avc'],
+          supportedAudioTypes: <String>[],
+        ),
+        MediaCodecCapability(
+          name: 'c2.android.aac.encoder',
+          isEncoder: true,
+          supportedTypes: <String>['audio/mp4a-latm'],
+          isHardwareAccelerated: false,
+          isSoftwareOnly: true,
+          isVendor: false,
+          supportedVideoTypes: <String>[],
+          supportedAudioTypes: <String>['audio/mp4a-latm'],
+        ),
+      ],
+    );
+  }
 }
 
 void main() {
@@ -124,5 +152,19 @@ void main() {
     expect(displayInfo.heightPixels, 2400);
     expect(displayInfo.refreshRate, 120);
     expect(displayInfo.isHdrSupported, true);
+  });
+
+  test('getMediaCodecs', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final List<MediaCodecCapability> codecs = await nativeLensPlugin
+        .getMediaCodecs();
+
+    expect(codecs.length, 2);
+    expect(codecs.first.name, 'c2.android.avc.decoder');
+    expect(codecs.first.isEncoder, false);
+    expect(codecs.last.supportedAudioTypes, <String>['audio/mp4a-latm']);
   });
 }

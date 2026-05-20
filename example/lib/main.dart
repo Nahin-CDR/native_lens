@@ -21,6 +21,7 @@ class _MyAppState extends State<MyApp> {
   List<SystemFeature>? _systemFeatures;
   List<NativeSensor>? _sensors;
   DisplayInfo? _displayInfo;
+  List<MediaCodecCapability>? _mediaCodecs;
   String? _errorMessage;
 
   @override
@@ -35,6 +36,7 @@ class _MyAppState extends State<MyApp> {
     List<SystemFeature>? systemFeatures;
     List<NativeSensor>? sensors;
     DisplayInfo? displayInfo;
+    List<MediaCodecCapability>? mediaCodecs;
     String? errorMessage;
 
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -43,6 +45,7 @@ class _MyAppState extends State<MyApp> {
       systemFeatures = await _nativeLensPlugin.getSystemFeatures();
       sensors = await _nativeLensPlugin.getSensors();
       displayInfo = await _nativeLensPlugin.getDisplayInfo();
+      mediaCodecs = await _nativeLensPlugin.getMediaCodecs();
     } on PlatformException {
       errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
@@ -59,6 +62,7 @@ class _MyAppState extends State<MyApp> {
       _systemFeatures = systemFeatures;
       _sensors = sensors;
       _displayInfo = displayInfo;
+      _mediaCodecs = mediaCodecs;
       _errorMessage = errorMessage;
     });
   }
@@ -87,6 +91,7 @@ class _MyAppState extends State<MyApp> {
     final List<SystemFeature>? features = _systemFeatures;
     final List<NativeSensor>? sensors = _sensors;
     final DisplayInfo? displayInfo = _displayInfo;
+    final List<MediaCodecCapability>? mediaCodecs = _mediaCodecs;
 
     if (_errorMessage != null) {
       return Center(
@@ -101,9 +106,15 @@ class _MyAppState extends State<MyApp> {
     if (summary == null ||
         features == null ||
         sensors == null ||
-        displayInfo == null) {
+        displayInfo == null ||
+        mediaCodecs == null) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    final int encoderCount = mediaCodecs
+        .where((MediaCodecCapability codec) => codec.isEncoder)
+        .length;
+    final int decoderCount = mediaCodecs.length - encoderCount;
 
     return ListView(
       children: <Widget>[
@@ -144,6 +155,15 @@ class _MyAppState extends State<MyApp> {
           label: 'HDR Types',
           value: _formatTextList(displayInfo.supportedHdrTypes),
         ),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'Media Codecs'),
+        const SizedBox(height: 8),
+        Text('Total codecs: ${mediaCodecs.length}'),
+        Text('Encoders: $encoderCount'),
+        Text('Decoders: $decoderCount'),
+        const SizedBox(height: 12),
+        for (final MediaCodecCapability codec in mediaCodecs)
+          _MediaCodecRow(codec: codec),
         const SizedBox(height: 28),
         _SectionTitle(title: 'System Features'),
         const SizedBox(height: 8),
@@ -255,6 +275,33 @@ class _SensorRow extends StatelessWidget {
           Text('Vendor: ${sensor.vendor}'),
           Text('Power: ${sensor.power} mA'),
           Text('Resolution: ${sensor.resolution}'),
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaCodecRow extends StatelessWidget {
+  const _MediaCodecRow({required this.codec});
+
+  final MediaCodecCapability codec;
+
+  @override
+  Widget build(BuildContext context) {
+    final String codecKind = codec.isEncoder ? 'Encoder' : 'Decoder';
+    final String supportedTypes = codec.supportedTypes.isEmpty
+        ? 'None'
+        : codec.supportedTypes.join(', ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(codec.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(codecKind),
+          Text('Types: $supportedTypes'),
         ],
       ),
     );
