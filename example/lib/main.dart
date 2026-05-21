@@ -27,9 +27,11 @@ class _MyAppState extends State<MyApp> {
   NetworkCapability? _networkCapability;
   NetworkSpeedSample? _networkSpeedSample;
   NativeLensReport? _nativeLensReport;
+  CompatibilitySummary? _compatibilitySummary;
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   bool _isGeneratingReport = false;
+  bool _isAnalyzingCompatibility = false;
   String? _errorMessage;
 
   @override
@@ -156,6 +158,32 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  Future<void> analyzeCompatibility() async {
+    setState(() {
+      _isAnalyzingCompatibility = true;
+      _errorMessage = null;
+    });
+
+    CompatibilitySummary? summary;
+    String? errorMessage;
+
+    try {
+      summary = await _nativeLensPlugin.analyzeCompatibility();
+    } on PlatformException {
+      errorMessage = 'Failed to analyze compatibility.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _compatibilitySummary = summary;
+      _isAnalyzingCompatibility = false;
+      _errorMessage = errorMessage;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -187,6 +215,7 @@ class _MyAppState extends State<MyApp> {
     final NetworkCapability? networkCapability = _networkCapability;
     final NetworkSpeedSample? networkSpeedSample = _networkSpeedSample;
     final NativeLensReport? nativeLensReport = _nativeLensReport;
+    final CompatibilitySummary? compatibilitySummary = _compatibilitySummary;
 
     if (_errorMessage != null) {
       return Center(
@@ -228,6 +257,58 @@ class _MyAppState extends State<MyApp> {
                 : 'Generate Full Report',
           ),
         ),
+        const SizedBox(height: 12),
+        FilledButton.tonal(
+          onPressed: _isAnalyzingCompatibility ? null : analyzeCompatibility,
+          child: Text(
+            _isAnalyzingCompatibility
+                ? 'Analyzing Compatibility...'
+                : 'Analyze Compatibility',
+          ),
+        ),
+        if (compatibilitySummary != null) ...<Widget>[
+          const SizedBox(height: 24),
+          _SectionTitle(title: 'Compatibility'),
+          const SizedBox(height: 16),
+          _SummaryRow(
+            label: 'Score',
+            value:
+                '${compatibilitySummary.overallScore} '
+                '(${compatibilitySummary.overallLevel})',
+          ),
+          _SummaryRow(
+            label: 'Power',
+            value: compatibilitySummary.powerRiskLevel,
+          ),
+          _SummaryRow(
+            label: 'Network',
+            value: compatibilitySummary.networkRiskLevel,
+          ),
+          _SummaryRow(
+            label: 'Media',
+            value: compatibilitySummary.mediaCapabilityLevel,
+          ),
+          _SummaryRow(
+            label: 'Camera',
+            value: compatibilitySummary.cameraCapabilityLevel,
+          ),
+          _SummaryRow(
+            label: 'Display',
+            value: compatibilitySummary.displayCapabilityLevel,
+          ),
+          const SizedBox(height: 8),
+          _TextListSection(
+            title: 'Warnings',
+            values: compatibilitySummary.warnings,
+            emptyText: 'No warnings',
+          ),
+          const SizedBox(height: 12),
+          _TextListSection(
+            title: 'Recommendations',
+            values: compatibilitySummary.recommendations,
+            emptyText: 'No recommendations',
+          ),
+        ],
         if (nativeLensReport != null) ...<Widget>[
           const SizedBox(height: 24),
           _SectionTitle(title: 'Full Report'),
@@ -525,6 +606,39 @@ class _SummaryRow extends StatelessWidget {
           Expanded(child: Text(value)),
         ],
       ),
+    );
+  }
+}
+
+class _TextListSection extends StatelessWidget {
+  const _TextListSection({
+    required this.title,
+    required this.values,
+    required this.emptyText,
+  });
+
+  final String title;
+  final List<String> values;
+  final String emptyText;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextStyle? titleStyle = Theme.of(context).textTheme.titleSmall;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(title, style: titleStyle),
+        const SizedBox(height: 6),
+        if (values.isEmpty)
+          Text(emptyText)
+        else
+          for (final String value in values)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Text('- $value'),
+            ),
+      ],
     );
   }
 }

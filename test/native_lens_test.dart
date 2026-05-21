@@ -319,6 +319,31 @@ void main() {
     expect(report.toString(), contains('NativeLensReport'));
   });
 
+  test('analyzeCompatibility', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final CompatibilitySummary summary = await nativeLensPlugin
+        .analyzeCompatibility();
+    final Map<String, Object> summaryMap = summary.toMap();
+
+    expect(summary.overallScore, 85);
+    expect(summary.overallLevel, 'Excellent');
+    expect(summary.powerRiskLevel, 'Low');
+    expect(summary.networkRiskLevel, 'Low');
+    expect(summary.mediaCapabilityLevel, 'Low');
+    expect(summary.cameraCapabilityLevel, 'High');
+    expect(summary.displayCapabilityLevel, 'High');
+    expect(summary.warnings, isEmpty);
+    expect(
+      summary.recommendations,
+      contains('HEVC encoder is unavailable. Use H.264 fallback.'),
+    );
+    expect(summaryMap['overallScore'], summary.overallScore);
+    expect(summary.toString(), contains('CompatibilitySummary'));
+  });
+
   test('networkCapabilityStream', () async {
     NativeLens nativeLensPlugin = NativeLens();
     MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
