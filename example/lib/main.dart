@@ -26,8 +26,10 @@ class _MyAppState extends State<MyApp> {
   PowerState? _powerState;
   NetworkCapability? _networkCapability;
   NetworkSpeedSample? _networkSpeedSample;
+  NativeLensReport? _nativeLensReport;
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
+  bool _isGeneratingReport = false;
   String? _errorMessage;
 
   @override
@@ -128,6 +130,32 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
+  Future<void> generateFullReport() async {
+    setState(() {
+      _isGeneratingReport = true;
+      _errorMessage = null;
+    });
+
+    NativeLensReport? report;
+    String? errorMessage;
+
+    try {
+      report = await _nativeLensPlugin.generateReport();
+    } on PlatformException {
+      errorMessage = 'Failed to generate NativeLens report.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _nativeLensReport = report;
+      _isGeneratingReport = false;
+      _errorMessage = errorMessage;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -158,6 +186,7 @@ class _MyAppState extends State<MyApp> {
     final PowerState? powerState = _powerState;
     final NetworkCapability? networkCapability = _networkCapability;
     final NetworkSpeedSample? networkSpeedSample = _networkSpeedSample;
+    final NativeLensReport? nativeLensReport = _nativeLensReport;
 
     if (_errorMessage != null) {
       return Center(
@@ -191,6 +220,52 @@ class _MyAppState extends State<MyApp> {
 
     return ListView(
       children: <Widget>[
+        FilledButton(
+          onPressed: _isGeneratingReport ? null : generateFullReport,
+          child: Text(
+            _isGeneratingReport
+                ? 'Generating Report...'
+                : 'Generate Full Report',
+          ),
+        ),
+        if (nativeLensReport != null) ...<Widget>[
+          const SizedBox(height: 24),
+          _SectionTitle(title: 'Full Report'),
+          const SizedBox(height: 16),
+          _SummaryRow(
+            label: 'Generated',
+            value: _formatTimestamp(nativeLensReport.generatedAtMillis),
+          ),
+          _SummaryRow(
+            label: 'Features',
+            value: nativeLensReport.systemFeatures.length.toString(),
+          ),
+          _SummaryRow(
+            label: 'Sensors',
+            value: nativeLensReport.sensors.length.toString(),
+          ),
+          _SummaryRow(
+            label: 'Codecs',
+            value: nativeLensReport.mediaCodecs.length.toString(),
+          ),
+          _SummaryRow(
+            label: 'Cameras',
+            value: nativeLensReport.cameraCapabilities.length.toString(),
+          ),
+          _SummaryRow(
+            label: 'Power',
+            value:
+                '${nativeLensReport.powerState.batteryLevel}% '
+                '${nativeLensReport.powerState.batteryStatus}',
+          ),
+          _SummaryRow(
+            label: 'Network',
+            value: nativeLensReport.networkCapability.isConnected
+                ? nativeLensReport.networkCapability.transportType
+                : 'Disconnected',
+          ),
+        ],
+        const SizedBox(height: 28),
         _SectionTitle(title: 'Platform Summary'),
         const SizedBox(height: 16),
         _SummaryRow(label: 'Manufacturer', value: summary.manufacturer),
@@ -401,6 +476,18 @@ class _MyAppState extends State<MyApp> {
     }
 
     return '$bytes bytes';
+  }
+
+  String _formatTimestamp(int timestampMillis) {
+    final DateTime time = DateTime.fromMillisecondsSinceEpoch(timestampMillis);
+    final String year = time.year.toString().padLeft(4, '0');
+    final String month = time.month.toString().padLeft(2, '0');
+    final String day = time.day.toString().padLeft(2, '0');
+    final String hour = time.hour.toString().padLeft(2, '0');
+    final String minute = time.minute.toString().padLeft(2, '0');
+    final String second = time.second.toString().padLeft(2, '0');
+
+    return '$year-$month-$day $hour:$minute:$second';
   }
 }
 

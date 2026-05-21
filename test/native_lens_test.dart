@@ -298,6 +298,27 @@ void main() {
     expect(networkCapability.hasWifi, true);
   });
 
+  test('generateReport', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+    final int beforeReport = DateTime.now().millisecondsSinceEpoch;
+
+    final NativeLensReport report = await nativeLensPlugin.generateReport();
+    final Map<String, Object?> reportMap = report.toMap();
+
+    expect(report.platformSummary.manufacturer, 'Google');
+    expect(report.systemFeatures.length, 2);
+    expect(report.sensors.length, 1);
+    expect(report.mediaCodecs.length, 2);
+    expect(report.cameraCapabilities.length, 1);
+    expect(report.powerState.batteryLevel, 88);
+    expect(report.networkCapability.transportType, 'Wi-Fi');
+    expect(report.generatedAtMillis, greaterThanOrEqualTo(beforeReport));
+    expect(reportMap['generatedAtMillis'], report.generatedAtMillis);
+    expect(report.toString(), contains('NativeLensReport'));
+  });
+
   test('networkCapabilityStream', () async {
     NativeLens nativeLensPlugin = NativeLens();
     MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();

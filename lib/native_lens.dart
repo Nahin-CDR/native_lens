@@ -2,6 +2,7 @@ import 'camera_capability.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
+import 'native_lens_report.dart';
 import 'native_sensor.dart';
 import 'network_capability.dart';
 import 'network_speed_sample.dart';
@@ -13,6 +14,7 @@ export 'camera_capability.dart';
 export 'display_info.dart';
 export 'media_codec_capability.dart';
 export 'native_sensor.dart';
+export 'native_lens_report.dart';
 export 'network_capability.dart';
 export 'network_speed_sample.dart';
 export 'platform_summary.dart';
@@ -59,6 +61,35 @@ class NativeLens {
   /// Returns native Android network capability information for the active network.
   Future<NetworkCapability> getNetworkCapability() {
     return NativeLensPlatform.instance.getNetworkCapability();
+  }
+
+  /// Generates a complete snapshot report from the existing NativeLens APIs.
+  ///
+  /// This method does not call any new native Android API. It collects the
+  /// current platform, feature, sensor, display, media, camera, power, and
+  /// network snapshots into one readable [NativeLensReport].
+  Future<NativeLensReport> generateReport() async {
+    final PlatformSummary platformSummary = await getPlatformSummary();
+    final List<SystemFeature> systemFeatures = await getSystemFeatures();
+    final List<NativeSensor> sensors = await getSensors();
+    final DisplayInfo displayInfo = await getDisplayInfo();
+    final List<MediaCodecCapability> mediaCodecs = await getMediaCodecs();
+    final List<CameraCapability> cameraCapabilities =
+        await getCameraCapabilities();
+    final PowerState powerState = await getPowerState();
+    final NetworkCapability networkCapability = await getNetworkCapability();
+
+    return NativeLensReport(
+      platformSummary: platformSummary,
+      systemFeatures: systemFeatures,
+      sensors: sensors,
+      displayInfo: displayInfo,
+      mediaCodecs: mediaCodecs,
+      cameraCapabilities: cameraCapabilities,
+      powerState: powerState,
+      networkCapability: networkCapability,
+      generatedAtMillis: DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   /// Emits native Android network capability updates as the active network changes.
