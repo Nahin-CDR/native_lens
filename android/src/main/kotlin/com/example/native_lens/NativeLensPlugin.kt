@@ -3,6 +3,10 @@ package com.example.native_lens
 import android.content.Context
 import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraMetadata
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.media.MediaCodecInfo
@@ -28,6 +32,7 @@ class NativeLensPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
+    private lateinit var cameraManager: CameraManager
     private lateinit var sensorManager: SensorManager
     private lateinit var windowManager: WindowManager
 
@@ -36,6 +41,8 @@ class NativeLensPlugin :
         channel.setMethodCallHandler(this)
         applicationContext = flutterPluginBinding.applicationContext
         packageManager = applicationContext.packageManager
+        cameraManager =
+            applicationContext.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         sensorManager =
             applicationContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         windowManager =
@@ -52,6 +59,7 @@ class NativeLensPlugin :
             "getSensors" -> result.success(getSensors())
             "getDisplayInfo" -> result.success(getDisplayInfo())
             "getMediaCodecs" -> result.success(getMediaCodecs())
+            "getCameraCapabilities" -> result.success(getCameraCapabilities())
             else -> result.notImplemented()
         }
     }
@@ -283,6 +291,122 @@ class NativeLensPlugin :
         }
 
         return codecInfo.isVendor
+    }
+
+    private fun getCameraCapabilities(): List<Map<String, Any>> {
+        val cameras = mutableListOf<Map<String, Any>>()
+        val cameraIds =
+            try {
+                cameraManager.cameraIdList
+            } catch (exception: CameraAccessException) {
+                return emptyList()
+            } catch (exception: RuntimeException) {
+                return emptyList()
+            }
+
+        for (cameraId in cameraIds) {
+            try {
+                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+                cameras.add(getCameraCapability(cameraId, characteristics))
+            } catch (exception: CameraAccessException) {
+                // Skip cameras that cannot be queried so one failure does not break the list.
+            } catch (exception: RuntimeException) {
+                // Some devices expose camera IDs that can fail during metadata reads.
+            }
+        }
+
+        return cameras
+    }
+
+    private fun getCameraCapability(
+        cameraId: String,
+        characteristics: CameraCharacteristics
+    ): Map<String, Any> {
+        return mapOf(
+            "cameraId" to cameraId,
+            "lensFacing" to getLensFacingName(characteristics),
+            "hardwareLevel" to getHardwareLevelName(characteristics),
+            "hasFlash" to (characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE)
+                ?: false),
+            "sensorOrientation" to (characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)
+                ?: 0),
+            "supportsRawCapture" to hasCameraCapability(
+                characteristics,
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW
+            ),
+            "supportsManualSensor" to hasCameraCapability(
+                characteristics,
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR
+            ),
+            "supportsManualPostProcessing" to hasCameraCapability(
+                characteristics,
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_POST_PROCESSING
+            ),
+            "supportsAutoFocus" to supportsAutoFocus(characteristics),
+            "supportsOpticalStabilization" to supportsOpticalStabilization(characteristics),
+            "supportedFpsRanges" to getSupportedFpsRanges(characteristics)
+        )
+    }
+
+    private fun getLensFacingName(characteristics: CameraCharacteristics): String {
+        return when (characteristics.get(CameraCharacteristics.LENS_FACING)) {
+            CameraCharacteristics.LENS_FACING_FRONT -> "Front"
+            CameraCharacteristics.LENS_FACING_BACK -> "Back"
+            CameraCharacteristics.LENS_FACING_EXTERNAL -> "External"
+            else -> "Unknown"
+        }
+    }
+
+    private fun getHardwareLevelName(characteristics: CameraCharacteristics): String {
+        return when (characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)) {
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY -> "Legacy"
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED -> "Limited"
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL -> "Full"
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3 -> "Level 3"
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL -> "External"
+            else -> "Unknown"
+        }
+    }
+
+    private fun hasCameraCapability(
+        characteristics: CameraCharacteristics,
+        capability: Int
+    ): Boolean {
+        val capabilities =
+            characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+                ?: return false
+
+        return capabilities.contains(capability)
+    }
+
+    private fun supportsAutoFocus(characteristics: CameraCharacteristics): Boolean {
+        val autoFocusModes =
+            characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
+                ?: return false
+
+        return autoFocusModes.any { mode ->
+            mode != CameraMetadata.CONTROL_AF_MODE_OFF
+        }
+    }
+
+    private fun supportsOpticalStabilization(characteristics: CameraCharacteristics): Boolean {
+        val stabilizationModes =
+            characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
+                ?: return false
+
+        return stabilizationModes.contains(
+            CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_ON
+        )
+    }
+
+    private fun getSupportedFpsRanges(characteristics: CameraCharacteristics): List<String> {
+        val ranges =
+            characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+                ?: return emptyList()
+
+        return ranges.map { range ->
+            "${range.lower}-${range.upper} fps"
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {

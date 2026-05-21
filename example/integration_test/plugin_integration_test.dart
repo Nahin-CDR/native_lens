@@ -55,4 +55,12 @@ void main() {
     expect(codecs.isNotEmpty, true);
     expect(codecs.first.name.isNotEmpty, true);
   });
+
+  testWidgets('getCameraCapabilities test', (WidgetTester tester) async {
+    final NativeLens plugin = NativeLens();
+    final List<CameraCapability> cameras = await plugin.getCameraCapabilities();
+
+    expect(cameras.isNotEmpty, true);
+    expect(cameras.first.cameraId.isNotEmpty, true);
+  });
 }

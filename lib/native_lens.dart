@@ -1,3 +1,4 @@
+import 'camera_capability.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
@@ -5,6 +6,7 @@ import 'native_sensor.dart';
 import 'platform_summary.dart';
 import 'system_feature.dart';
 
+export 'camera_capability.dart';
 export 'display_info.dart';
 export 'media_codec_capability.dart';
 export 'native_sensor.dart';
@@ -36,5 +38,10 @@ class NativeLens {
   /// Returns native Android media codec capabilities reported by the device.
   Future<List<MediaCodecCapability>> getMediaCodecs() {
     return NativeLensPlatform.instance.getMediaCodecs();
+  }
+
+  /// Returns native Android Camera2 capabilities reported by the device.
+  Future<List<CameraCapability>> getCameraCapabilities() {
+    return NativeLensPlatform.instance.getCameraCapabilities();
   }
 }

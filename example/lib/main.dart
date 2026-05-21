@@ -22,6 +22,7 @@ class _MyAppState extends State<MyApp> {
   List<NativeSensor>? _sensors;
   DisplayInfo? _displayInfo;
   List<MediaCodecCapability>? _mediaCodecs;
+  List<CameraCapability>? _cameraCapabilities;
   String? _errorMessage;
 
   @override
@@ -37,6 +38,7 @@ class _MyAppState extends State<MyApp> {
     List<NativeSensor>? sensors;
     DisplayInfo? displayInfo;
     List<MediaCodecCapability>? mediaCodecs;
+    List<CameraCapability>? cameraCapabilities;
     String? errorMessage;
 
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -46,6 +48,7 @@ class _MyAppState extends State<MyApp> {
       sensors = await _nativeLensPlugin.getSensors();
       displayInfo = await _nativeLensPlugin.getDisplayInfo();
       mediaCodecs = await _nativeLensPlugin.getMediaCodecs();
+      cameraCapabilities = await _nativeLensPlugin.getCameraCapabilities();
     } on PlatformException {
       errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
@@ -63,6 +66,7 @@ class _MyAppState extends State<MyApp> {
       _sensors = sensors;
       _displayInfo = displayInfo;
       _mediaCodecs = mediaCodecs;
+      _cameraCapabilities = cameraCapabilities;
       _errorMessage = errorMessage;
     });
   }
@@ -92,6 +96,7 @@ class _MyAppState extends State<MyApp> {
     final List<NativeSensor>? sensors = _sensors;
     final DisplayInfo? displayInfo = _displayInfo;
     final List<MediaCodecCapability>? mediaCodecs = _mediaCodecs;
+    final List<CameraCapability>? cameraCapabilities = _cameraCapabilities;
 
     if (_errorMessage != null) {
       return Center(
@@ -107,7 +112,8 @@ class _MyAppState extends State<MyApp> {
         features == null ||
         sensors == null ||
         displayInfo == null ||
-        mediaCodecs == null) {
+        mediaCodecs == null ||
+        cameraCapabilities == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -164,6 +170,13 @@ class _MyAppState extends State<MyApp> {
         const SizedBox(height: 12),
         for (final MediaCodecCapability codec in mediaCodecs)
           _MediaCodecRow(codec: codec),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'Cameras'),
+        const SizedBox(height: 8),
+        Text('Total cameras: ${cameraCapabilities.length}'),
+        const SizedBox(height: 12),
+        for (final CameraCapability camera in cameraCapabilities)
+          _CameraCapabilityRow(camera: camera),
         const SizedBox(height: 28),
         _SectionTitle(title: 'System Features'),
         const SizedBox(height: 8),
@@ -302,6 +315,45 @@ class _MediaCodecRow extends StatelessWidget {
           const SizedBox(height: 2),
           Text(codecKind),
           Text('Types: $supportedTypes'),
+        ],
+      ),
+    );
+  }
+}
+
+class _CameraCapabilityRow extends StatelessWidget {
+  const _CameraCapabilityRow({required this.camera});
+
+  final CameraCapability camera;
+
+  @override
+  Widget build(BuildContext context) {
+    final String fpsRanges = camera.supportedFpsRanges.isEmpty
+        ? 'Unknown'
+        : camera.supportedFpsRanges.join(', ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Camera ${camera.cameraId}',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          Text('Lens: ${camera.lensFacing}'),
+          Text('Hardware: ${camera.hardwareLevel}'),
+          Text('Flash: ${camera.hasFlash ? 'Yes' : 'No'}'),
+          Text('RAW: ${camera.supportsRawCapture ? 'Yes' : 'No'}'),
+          Text('Manual sensor: ${camera.supportsManualSensor ? 'Yes' : 'No'}'),
+          Text(
+            'Manual post: '
+            '${camera.supportsManualPostProcessing ? 'Yes' : 'No'}',
+          ),
+          Text('Autofocus: ${camera.supportsAutoFocus ? 'Yes' : 'No'}'),
+          Text('OIS: ${camera.supportsOpticalStabilization ? 'Yes' : 'No'}'),
+          Text('FPS: $fpsRanges'),
         ],
       ),
     );

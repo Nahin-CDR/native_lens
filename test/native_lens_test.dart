@@ -96,6 +96,25 @@ class MockNativeLensPlatform
       ],
     );
   }
+
+  @override
+  Future<List<CameraCapability>> getCameraCapabilities() {
+    return Future<List<CameraCapability>>.value(const <CameraCapability>[
+      CameraCapability(
+        cameraId: '0',
+        lensFacing: 'Back',
+        hardwareLevel: 'Full',
+        hasFlash: true,
+        sensorOrientation: 90,
+        supportsRawCapture: true,
+        supportsManualSensor: true,
+        supportsManualPostProcessing: true,
+        supportsAutoFocus: true,
+        supportsOpticalStabilization: true,
+        supportedFpsRanges: <String>['15-30 fps', '30-60 fps'],
+      ),
+    ]);
+  }
 }
 
 void main() {
@@ -166,5 +185,19 @@ void main() {
     expect(codecs.first.name, 'c2.android.avc.decoder');
     expect(codecs.first.isEncoder, false);
     expect(codecs.last.supportedAudioTypes, <String>['audio/mp4a-latm']);
+  });
+
+  test('getCameraCapabilities', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final List<CameraCapability> cameras = await nativeLensPlugin
+        .getCameraCapabilities();
+
+    expect(cameras.length, 1);
+    expect(cameras.first.cameraId, '0');
+    expect(cameras.first.lensFacing, 'Back');
+    expect(cameras.first.supportsRawCapture, true);
   });
 }

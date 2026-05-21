@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:native_lens/camera_capability.dart';
 import 'package:native_lens/display_info.dart';
 import 'package:native_lens/media_codec_capability.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
@@ -83,6 +84,24 @@ void main() {
                 'isVendor': false,
                 'supportedVideoTypes': <String>[],
                 'supportedAudioTypes': <String>['audio/mp4a-latm'],
+              },
+            ];
+          }
+
+          if (methodCall.method == 'getCameraCapabilities') {
+            return <Map<String, Object>>[
+              <String, Object>{
+                'cameraId': '0',
+                'lensFacing': 'Back',
+                'hardwareLevel': 'Full',
+                'hasFlash': true,
+                'sensorOrientation': 90,
+                'supportsRawCapture': true,
+                'supportsManualSensor': true,
+                'supportsManualPostProcessing': true,
+                'supportsAutoFocus': true,
+                'supportsOpticalStabilization': true,
+                'supportedFpsRanges': <String>['15-30 fps', '30-60 fps'],
               },
             ];
           }
@@ -173,5 +192,26 @@ void main() {
     expect(codecs.last.name, 'c2.android.aac.encoder');
     expect(codecs.last.isEncoder, true);
     expect(codecs.last.supportedAudioTypes, <String>['audio/mp4a-latm']);
+  });
+
+  test('getCameraCapabilities', () async {
+    final List<CameraCapability> cameras = await platform
+        .getCameraCapabilities();
+
+    expect(cameras.length, 1);
+    expect(cameras.first.cameraId, '0');
+    expect(cameras.first.lensFacing, 'Back');
+    expect(cameras.first.hardwareLevel, 'Full');
+    expect(cameras.first.hasFlash, true);
+    expect(cameras.first.sensorOrientation, 90);
+    expect(cameras.first.supportsRawCapture, true);
+    expect(cameras.first.supportsManualSensor, true);
+    expect(cameras.first.supportsManualPostProcessing, true);
+    expect(cameras.first.supportsAutoFocus, true);
+    expect(cameras.first.supportsOpticalStabilization, true);
+    expect(cameras.first.supportedFpsRanges, <String>[
+      '15-30 fps',
+      '30-60 fps',
+    ]);
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'camera_capability.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
@@ -111,5 +112,28 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return codecs;
+  }
+
+  @override
+  Future<List<CameraCapability>> getCameraCapabilities() async {
+    final List<Object?>? cameraList = await methodChannel
+        .invokeListMethod<Object?>('getCameraCapabilities');
+
+    if (cameraList == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_camera_capabilities',
+        message: 'Android returned an empty camera capability list.',
+      );
+    }
+
+    final List<CameraCapability> cameras = <CameraCapability>[];
+
+    for (final Object? cameraItem in cameraList) {
+      if (cameraItem is Map<Object?, Object?>) {
+        cameras.add(CameraCapability.fromMap(cameraItem));
+      }
+    }
+
+    return cameras;
   }
 }
