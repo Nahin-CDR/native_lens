@@ -6,6 +6,7 @@ import 'package:native_lens/media_codec_capability.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
 import 'package:native_lens/native_sensor.dart';
 import 'package:native_lens/platform_summary.dart';
+import 'package:native_lens/power_state.dart';
 import 'package:native_lens/system_feature.dart';
 
 void main() {
@@ -104,6 +105,19 @@ void main() {
                 'supportedFpsRanges': <String>['15-30 fps', '30-60 fps'],
               },
             ];
+          }
+
+          if (methodCall.method == 'getPowerState') {
+            return <String, Object>{
+              'batteryLevel': 88,
+              'isCharging': true,
+              'chargingSource': 'USB',
+              'batteryHealth': 'Good',
+              'batteryStatus': 'Charging',
+              'batteryTemperatureCelsius': 31.5,
+              'isPowerSaveMode': false,
+              'isIgnoringBatteryOptimizations': false,
+            };
           }
 
           return <String, Object>{
@@ -213,5 +227,18 @@ void main() {
       '15-30 fps',
       '30-60 fps',
     ]);
+  });
+
+  test('getPowerState', () async {
+    final PowerState powerState = await platform.getPowerState();
+
+    expect(powerState.batteryLevel, 88);
+    expect(powerState.isCharging, true);
+    expect(powerState.chargingSource, 'USB');
+    expect(powerState.batteryHealth, 'Good');
+    expect(powerState.batteryStatus, 'Charging');
+    expect(powerState.batteryTemperatureCelsius, 31.5);
+    expect(powerState.isPowerSaveMode, false);
+    expect(powerState.isIgnoringBatteryOptimizations, false);
   });
 }

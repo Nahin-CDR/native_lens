@@ -7,6 +7,7 @@ import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
 import 'platform_summary.dart';
+import 'power_state.dart';
 import 'system_feature.dart';
 
 /// An implementation of [NativeLensPlatform] that uses method channels.
@@ -135,5 +136,20 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return cameras;
+  }
+
+  @override
+  Future<PowerState> getPowerState() async {
+    final Map<Object?, Object?>? powerMap = await methodChannel
+        .invokeMapMethod<Object?, Object?>('getPowerState');
+
+    if (powerMap == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_power_state',
+        message: 'Android returned empty power state information.',
+      );
+    }
+
+    return PowerState.fromMap(powerMap);
   }
 }

@@ -4,6 +4,7 @@ import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
 import 'platform_summary.dart';
+import 'power_state.dart';
 import 'system_feature.dart';
 
 export 'camera_capability.dart';
@@ -11,6 +12,7 @@ export 'display_info.dart';
 export 'media_codec_capability.dart';
 export 'native_sensor.dart';
 export 'platform_summary.dart';
+export 'power_state.dart';
 export 'system_feature.dart';
 
 /// Entry point for reading basic native Android information.
@@ -43,5 +45,10 @@ class NativeLens {
   /// Returns native Android Camera2 capabilities reported by the device.
   Future<List<CameraCapability>> getCameraCapabilities() {
     return NativeLensPlatform.instance.getCameraCapabilities();
+  }
+
+  /// Returns native Android battery and power runtime state.
+  Future<PowerState> getPowerState() {
+    return NativeLensPlatform.instance.getPowerState();
   }
 }

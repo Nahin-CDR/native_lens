@@ -1,6 +1,8 @@
 package com.example.native_lens
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraAccessException
@@ -11,7 +13,9 @@ import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
+import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
 import android.util.DisplayMetrics
 import android.view.Display
 import android.view.WindowManager
@@ -33,6 +37,7 @@ class NativeLensPlugin :
     private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
     private lateinit var cameraManager: CameraManager
+    private lateinit var powerManager: PowerManager
     private lateinit var sensorManager: SensorManager
     private lateinit var windowManager: WindowManager
 
@@ -43,6 +48,8 @@ class NativeLensPlugin :
         packageManager = applicationContext.packageManager
         cameraManager =
             applicationContext.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        powerManager =
+            applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
         sensorManager =
             applicationContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         windowManager =
@@ -60,6 +67,7 @@ class NativeLensPlugin :
             "getDisplayInfo" -> result.success(getDisplayInfo())
             "getMediaCodecs" -> result.success(getMediaCodecs())
             "getCameraCapabilities" -> result.success(getCameraCapabilities())
+            "getPowerState" -> result.success(getPowerState())
             else -> result.notImplemented()
         }
     }
@@ -407,6 +415,128 @@ class NativeLensPlugin :
         return ranges.map { range ->
             "${range.lower}-${range.upper} fps"
         }
+    }
+
+    private fun getPowerState(): Map<String, Any> {
+        val batteryIntent = getBatteryIntent()
+        val batteryLevel = getBatteryLevel(batteryIntent)
+        val batteryStatus = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val batteryHealth = batteryIntent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
+        val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val temperature = batteryIntent?.getIntExtra(
+            BatteryManager.EXTRA_TEMPERATURE,
+            Int.MIN_VALUE
+        ) ?: Int.MIN_VALUE
+
+        return mapOf(
+            "batteryLevel" to batteryLevel,
+            "isCharging" to isBatteryCharging(batteryStatus),
+            "chargingSource" to getChargingSourceName(plugged),
+            "batteryHealth" to getBatteryHealthName(batteryHealth),
+            "batteryStatus" to getBatteryStatusName(batteryStatus),
+            "batteryTemperatureCelsius" to getBatteryTemperatureCelsius(temperature),
+            "isPowerSaveMode" to isPowerSaveModeEnabled(),
+            "isIgnoringBatteryOptimizations" to isIgnoringBatteryOptimizations()
+        )
+    }
+
+    private fun getBatteryIntent(): Intent? {
+        return applicationContext.registerReceiver(
+            null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        )
+    }
+
+    private fun getBatteryLevel(batteryIntent: Intent?): Int {
+        if (batteryIntent == null) {
+            return getBatteryLevelFromManager()
+        }
+
+        val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+
+        if (level >= 0 && scale > 0) {
+            return ((level.toFloat() / scale.toFloat()) * 100).toInt()
+        }
+
+        return getBatteryLevelFromManager()
+    }
+
+    private fun getBatteryLevelFromManager(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return 0
+        }
+
+        val batteryManager =
+            applicationContext.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val level = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+
+        if (level >= 0) {
+            return level
+        }
+
+        return 0
+    }
+
+    private fun isBatteryCharging(status: Int): Boolean {
+        return status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL
+    }
+
+    private fun getChargingSourceName(plugged: Int): String {
+        return when (plugged) {
+            BatteryManager.BATTERY_PLUGGED_AC -> "AC"
+            BatteryManager.BATTERY_PLUGGED_USB -> "USB"
+            BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
+            0 -> "Not charging"
+            else -> "Unknown"
+        }
+    }
+
+    private fun getBatteryHealthName(health: Int): String {
+        return when (health) {
+            BatteryManager.BATTERY_HEALTH_GOOD -> "Good"
+            BatteryManager.BATTERY_HEALTH_OVERHEAT -> "Overheat"
+            BatteryManager.BATTERY_HEALTH_DEAD -> "Dead"
+            BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "Over voltage"
+            BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "Unspecified failure"
+            BatteryManager.BATTERY_HEALTH_COLD -> "Cold"
+            else -> "Unknown"
+        }
+    }
+
+    private fun getBatteryStatusName(status: Int): String {
+        return when (status) {
+            BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Not charging"
+            BatteryManager.BATTERY_STATUS_FULL -> "Full"
+            else -> "Unknown"
+        }
+    }
+
+    private fun getBatteryTemperatureCelsius(temperature: Int): Double {
+        if (temperature == Int.MIN_VALUE) {
+            return 0.0
+        }
+
+        return temperature / 10.0
+    }
+
+    private fun isPowerSaveModeEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false
+        }
+
+        return powerManager.isPowerSaveMode
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return false
+        }
+
+        return powerManager.isIgnoringBatteryOptimizations(applicationContext.packageName)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {

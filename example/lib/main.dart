@@ -23,6 +23,7 @@ class _MyAppState extends State<MyApp> {
   DisplayInfo? _displayInfo;
   List<MediaCodecCapability>? _mediaCodecs;
   List<CameraCapability>? _cameraCapabilities;
+  PowerState? _powerState;
   String? _errorMessage;
 
   @override
@@ -39,6 +40,7 @@ class _MyAppState extends State<MyApp> {
     DisplayInfo? displayInfo;
     List<MediaCodecCapability>? mediaCodecs;
     List<CameraCapability>? cameraCapabilities;
+    PowerState? powerState;
     String? errorMessage;
 
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -49,6 +51,7 @@ class _MyAppState extends State<MyApp> {
       displayInfo = await _nativeLensPlugin.getDisplayInfo();
       mediaCodecs = await _nativeLensPlugin.getMediaCodecs();
       cameraCapabilities = await _nativeLensPlugin.getCameraCapabilities();
+      powerState = await _nativeLensPlugin.getPowerState();
     } on PlatformException {
       errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
@@ -67,6 +70,7 @@ class _MyAppState extends State<MyApp> {
       _displayInfo = displayInfo;
       _mediaCodecs = mediaCodecs;
       _cameraCapabilities = cameraCapabilities;
+      _powerState = powerState;
       _errorMessage = errorMessage;
     });
   }
@@ -97,6 +101,7 @@ class _MyAppState extends State<MyApp> {
     final DisplayInfo? displayInfo = _displayInfo;
     final List<MediaCodecCapability>? mediaCodecs = _mediaCodecs;
     final List<CameraCapability>? cameraCapabilities = _cameraCapabilities;
+    final PowerState? powerState = _powerState;
 
     if (_errorMessage != null) {
       return Center(
@@ -113,7 +118,8 @@ class _MyAppState extends State<MyApp> {
         sensors == null ||
         displayInfo == null ||
         mediaCodecs == null ||
-        cameraCapabilities == null) {
+        cameraCapabilities == null ||
+        powerState == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -133,6 +139,31 @@ class _MyAppState extends State<MyApp> {
         _SummaryRow(label: 'Product', value: summary.product),
         _SummaryRow(label: 'Android SDK', value: summary.androidSdk.toString()),
         _SummaryRow(label: 'Android Release', value: summary.androidRelease),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'Power'),
+        const SizedBox(height: 16),
+        _SummaryRow(label: 'Battery', value: '${powerState.batteryLevel}%'),
+        _SummaryRow(
+          label: 'Charging',
+          value: powerState.isCharging ? 'Yes' : 'No',
+        ),
+        _SummaryRow(label: 'Source', value: powerState.chargingSource),
+        _SummaryRow(label: 'Health', value: powerState.batteryHealth),
+        _SummaryRow(label: 'Status', value: powerState.batteryStatus),
+        _SummaryRow(
+          label: 'Temperature',
+          value: '${powerState.batteryTemperatureCelsius} C',
+        ),
+        _SummaryRow(
+          label: 'Power saver',
+          value: powerState.isPowerSaveMode ? 'On' : 'Off',
+        ),
+        _SummaryRow(
+          label: 'Optimization',
+          value: powerState.isIgnoringBatteryOptimizations
+              ? 'Ignoring'
+              : 'Active',
+        ),
         const SizedBox(height: 28),
         _SectionTitle(title: 'Display'),
         const SizedBox(height: 16),

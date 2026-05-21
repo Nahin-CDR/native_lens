@@ -63,4 +63,12 @@ void main() {
     expect(cameras.isNotEmpty, true);
     expect(cameras.first.cameraId.isNotEmpty, true);
   });
+
+  testWidgets('getPowerState test', (WidgetTester tester) async {
+    final NativeLens plugin = NativeLens();
+    final PowerState powerState = await plugin.getPowerState();
+
+    expect(powerState.batteryLevel >= 0, true);
+    expect(powerState.batteryStatus.isNotEmpty, true);
+  });
 }

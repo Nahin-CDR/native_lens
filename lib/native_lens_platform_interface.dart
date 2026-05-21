@@ -6,6 +6,7 @@ import 'media_codec_capability.dart';
 import 'native_lens_method_channel.dart';
 import 'native_sensor.dart';
 import 'platform_summary.dart';
+import 'power_state.dart';
 import 'system_feature.dart';
 
 /// The platform interface for NativeLens implementations.
@@ -60,5 +61,10 @@ abstract class NativeLensPlatform extends PlatformInterface {
     throw UnimplementedError(
       'getCameraCapabilities() has not been implemented.',
     );
+  }
+
+  /// Returns native Android battery and power runtime state.
+  Future<PowerState> getPowerState() {
+    throw UnimplementedError('getPowerState() has not been implemented.');
   }
 }

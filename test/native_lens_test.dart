@@ -115,6 +115,22 @@ class MockNativeLensPlatform
       ),
     ]);
   }
+
+  @override
+  Future<PowerState> getPowerState() {
+    return Future<PowerState>.value(
+      const PowerState(
+        batteryLevel: 88,
+        isCharging: true,
+        chargingSource: 'USB',
+        batteryHealth: 'Good',
+        batteryStatus: 'Charging',
+        batteryTemperatureCelsius: 31.5,
+        isPowerSaveMode: false,
+        isIgnoringBatteryOptimizations: false,
+      ),
+    );
+  }
 }
 
 void main() {
@@ -199,5 +215,18 @@ void main() {
     expect(cameras.first.cameraId, '0');
     expect(cameras.first.lensFacing, 'Back');
     expect(cameras.first.supportsRawCapture, true);
+  });
+
+  test('getPowerState', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final PowerState powerState = await nativeLensPlugin.getPowerState();
+
+    expect(powerState.batteryLevel, 88);
+    expect(powerState.isCharging, true);
+    expect(powerState.chargingSource, 'USB');
+    expect(powerState.batteryHealth, 'Good');
   });
 }
