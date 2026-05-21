@@ -7,6 +7,7 @@ import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
 import 'network_capability.dart';
+import 'network_speed_sample.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
 import 'system_feature.dart';
@@ -16,6 +17,18 @@ class MethodChannelNativeLens extends NativeLensPlatform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel('native_lens');
+
+  /// The event channel used to receive live app network speed samples.
+  @visibleForTesting
+  final networkSpeedEventChannel = const EventChannel(
+    'native_lens/network_speed',
+  );
+
+  /// The event channel used to receive live Android network capability updates.
+  @visibleForTesting
+  final networkCapabilityEventChannel = const EventChannel(
+    'native_lens/network_capability',
+  );
 
   @override
   Future<PlatformSummary> getPlatformSummary() async {
@@ -167,5 +180,31 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return NetworkCapability.fromMap(networkMap);
+  }
+
+  @override
+  Stream<NetworkCapability> get networkCapabilityStream {
+    return networkCapabilityEventChannel.receiveBroadcastStream().map((
+      Object? event,
+    ) {
+      if (event is Map<Object?, Object?>) {
+        return NetworkCapability.fromMap(event);
+      }
+
+      return NetworkCapability.fromMap(<Object?, Object?>{});
+    });
+  }
+
+  @override
+  Stream<NetworkSpeedSample> get networkSpeedStream {
+    return networkSpeedEventChannel.receiveBroadcastStream().map((
+      Object? event,
+    ) {
+      if (event is Map<Object?, Object?>) {
+        return NetworkSpeedSample.fromMap(event);
+      }
+
+      return NetworkSpeedSample.fromMap(<Object?, Object?>{});
+    });
   }
 }

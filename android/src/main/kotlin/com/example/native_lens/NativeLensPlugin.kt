@@ -6,7 +6,9 @@ import android.content.IntentFilter
 import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.TrafficStats
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -17,11 +19,15 @@ import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
+import android.os.Process
 import android.util.DisplayMetrics
 import android.view.Display
 import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -36,6 +42,8 @@ class NativeLensPlugin :
     // This local reference serves to register the plugin with the Flutter Engine and unregister it
     // when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
+    private lateinit var networkSpeedChannel: EventChannel
+    private lateinit var networkCapabilityChannel: EventChannel
     private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
     private lateinit var cameraManager: CameraManager
@@ -43,10 +51,57 @@ class NativeLensPlugin :
     private lateinit var powerManager: PowerManager
     private lateinit var sensorManager: SensorManager
     private lateinit var windowManager: WindowManager
+    private val networkSpeedHandler = Handler(Looper.getMainLooper())
+    private var networkSpeedEvents: EventChannel.EventSink? = null
+    private var networkCapabilityEvents: EventChannel.EventSink? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var previousRxBytes = 0L
+    private var previousTxBytes = 0L
+    private var previousSpeedSampleTimeMillis = 0L
+    private var hasNetworkSpeedBaseline = false
+    private val networkSpeedRunnable =
+        object : Runnable {
+            override fun run() {
+                emitNetworkSpeedSample()
+                networkSpeedHandler.postDelayed(this, 1000)
+            }
+        }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "native_lens")
         channel.setMethodCallHandler(this)
+        networkCapabilityChannel =
+            EventChannel(flutterPluginBinding.binaryMessenger, "native_lens/network_capability")
+        networkCapabilityChannel.setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(
+                    arguments: Any?,
+                    events: EventChannel.EventSink
+                ) {
+                    startNetworkCapabilityStream(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopNetworkCapabilityStream()
+                }
+            }
+        )
+        networkSpeedChannel =
+            EventChannel(flutterPluginBinding.binaryMessenger, "native_lens/network_speed")
+        networkSpeedChannel.setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(
+                    arguments: Any?,
+                    events: EventChannel.EventSink
+                ) {
+                    startNetworkSpeedStream(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopNetworkSpeedStream()
+                }
+            }
+        )
         applicationContext = flutterPluginBinding.applicationContext
         packageManager = applicationContext.packageManager
         cameraManager =
@@ -656,7 +711,219 @@ class NativeLensPlugin :
         )
     }
 
+    private fun startNetworkCapabilityStream(events: EventChannel.EventSink) {
+        stopNetworkCapabilityStream()
+        networkCapabilityEvents = events
+        emitNetworkCapabilityUpdate()
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return
+        }
+
+        val callback =
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    resetNetworkSpeedBaseline()
+                    emitNetworkCapabilityUpdate()
+                }
+
+                override fun onLost(network: Network) {
+                    resetNetworkSpeedBaseline()
+                    emitNetworkCapabilityUpdate()
+                }
+
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    networkCapabilities: NetworkCapabilities
+                ) {
+                    emitNetworkCapabilityUpdate()
+                }
+            }
+
+        networkCallback = callback
+
+        try {
+            connectivityManager.registerDefaultNetworkCallback(callback)
+        } catch (exception: RuntimeException) {
+            networkCallback = null
+        }
+    }
+
+    private fun stopNetworkCapabilityStream() {
+        val callback = networkCallback
+
+        if (callback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(callback)
+            } catch (exception: RuntimeException) {
+                // The callback may already be unregistered while the engine is detaching.
+            }
+        }
+
+        networkCallback = null
+        networkCapabilityEvents = null
+    }
+
+    private fun emitNetworkCapabilityUpdate() {
+        if (networkCapabilityEvents == null) {
+            return
+        }
+
+        // NetworkCapability stream listens to Android network callbacks so the
+        // Flutter UI can react to Wi-Fi, cellular, VPN, and flight mode changes.
+        networkSpeedHandler.post {
+            networkCapabilityEvents?.success(getNetworkCapability())
+        }
+    }
+
+    private fun startNetworkSpeedStream(events: EventChannel.EventSink) {
+        stopNetworkSpeedStream()
+        networkSpeedEvents = events
+        resetNetworkSpeedBaseline()
+        emitNetworkSpeedSample()
+        networkSpeedHandler.postDelayed(networkSpeedRunnable, 1000)
+    }
+
+    private fun stopNetworkSpeedStream() {
+        networkSpeedHandler.removeCallbacks(networkSpeedRunnable)
+        networkSpeedEvents = null
+    }
+
+    private fun resetNetworkSpeedBaseline() {
+        previousRxBytes = getUidRxBytes()
+        previousTxBytes = getUidTxBytes()
+        previousSpeedSampleTimeMillis = System.currentTimeMillis()
+        hasNetworkSpeedBaseline = false
+    }
+
+    private fun emitNetworkSpeedSample() {
+        val events = networkSpeedEvents ?: return
+        val currentTimeMillis = System.currentTimeMillis()
+        val currentRxBytes = getUidRxBytes()
+        val currentTxBytes = getUidTxBytes()
+        val isSupported =
+            currentRxBytes != TrafficStats.UNSUPPORTED.toLong() &&
+                currentTxBytes != TrafficStats.UNSUPPORTED.toLong()
+
+        if (!isSupported) {
+            resetNetworkSpeedBaseline()
+            events.success(createUnsupportedNetworkSpeedSample(currentTimeMillis))
+            return
+        }
+
+        if (!hasActiveNetworkConnection()) {
+            resetNetworkSpeedBaseline()
+            events.success(
+                createNetworkSpeedSample(
+                    timestampMillis = currentTimeMillis,
+                    rxBytesPerSecond = 0L,
+                    txBytesPerSecond = 0L,
+                    totalRxBytes = currentRxBytes,
+                    totalTxBytes = currentTxBytes,
+                    isSupported = true
+                )
+            )
+            return
+        }
+
+        if (!hasNetworkSpeedBaseline) {
+            previousRxBytes = currentRxBytes
+            previousTxBytes = currentTxBytes
+            previousSpeedSampleTimeMillis = currentTimeMillis
+            hasNetworkSpeedBaseline = true
+            events.success(
+                createNetworkSpeedSample(
+                    timestampMillis = currentTimeMillis,
+                    rxBytesPerSecond = 0L,
+                    txBytesPerSecond = 0L,
+                    totalRxBytes = currentRxBytes,
+                    totalTxBytes = currentTxBytes,
+                    isSupported = true
+                )
+            )
+            return
+        }
+
+        val elapsedMillis = currentTimeMillis - previousSpeedSampleTimeMillis
+        val safeElapsedMillis =
+            if (elapsedMillis > 0L) {
+                elapsedMillis
+            } else {
+                1000L
+            }
+        val rxBytesDelta = (currentRxBytes - previousRxBytes).coerceAtLeast(0L)
+        val txBytesDelta = (currentTxBytes - previousTxBytes).coerceAtLeast(0L)
+        val rxBytesPerSecond = (rxBytesDelta * 1000L) / safeElapsedMillis
+        val txBytesPerSecond = (txBytesDelta * 1000L) / safeElapsedMillis
+
+        previousRxBytes = currentRxBytes
+        previousTxBytes = currentTxBytes
+        previousSpeedSampleTimeMillis = currentTimeMillis
+
+        events.success(
+            createNetworkSpeedSample(
+                timestampMillis = currentTimeMillis,
+                rxBytesPerSecond = rxBytesPerSecond,
+                txBytesPerSecond = txBytesPerSecond,
+                totalRxBytes = currentRxBytes,
+                totalTxBytes = currentTxBytes,
+                isSupported = true
+            )
+        )
+    }
+
+    private fun hasActiveNetworkConnection(): Boolean {
+        return isNetworkConnected(getActiveNetworkCapabilities())
+    }
+
+    private fun createNetworkSpeedSample(
+        timestampMillis: Long,
+        rxBytesPerSecond: Long,
+        txBytesPerSecond: Long,
+        totalRxBytes: Long,
+        totalTxBytes: Long,
+        isSupported: Boolean
+    ): Map<String, Any> {
+        return mapOf(
+            "timestampMillis" to timestampMillis,
+            "rxBytesPerSecond" to rxBytesPerSecond,
+            "txBytesPerSecond" to txBytesPerSecond,
+            "rxKbps" to bytesPerSecondToKbps(rxBytesPerSecond),
+            "txKbps" to bytesPerSecondToKbps(txBytesPerSecond),
+            "totalRxBytes" to totalRxBytes,
+            "totalTxBytes" to totalTxBytes,
+            "isSupported" to isSupported
+        )
+    }
+
+    private fun createUnsupportedNetworkSpeedSample(timestampMillis: Long): Map<String, Any> {
+        return createNetworkSpeedSample(
+            timestampMillis = timestampMillis,
+            rxBytesPerSecond = 0L,
+            txBytesPerSecond = 0L,
+            totalRxBytes = 0L,
+            totalTxBytes = 0L,
+            isSupported = false
+        )
+    }
+
+    private fun getUidRxBytes(): Long {
+        return TrafficStats.getUidRxBytes(Process.myUid())
+    }
+
+    private fun getUidTxBytes(): Long {
+        return TrafficStats.getUidTxBytes(Process.myUid())
+    }
+
+    private fun bytesPerSecondToKbps(bytesPerSecond: Long): Double {
+        return (bytesPerSecond * 8.0) / 1000.0
+    }
+
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        stopNetworkCapabilityStream()
+        stopNetworkSpeedStream()
+        networkCapabilityChannel.setStreamHandler(null)
+        networkSpeedChannel.setStreamHandler(null)
         channel.setMethodCallHandler(null)
     }
 }

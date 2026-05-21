@@ -25,12 +25,24 @@ class _MyAppState extends State<MyApp> {
   List<CameraCapability>? _cameraCapabilities;
   PowerState? _powerState;
   NetworkCapability? _networkCapability;
+  NetworkSpeedSample? _networkSpeedSample;
+  StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
+  StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     initPlatformState();
+    listenToNetworkCapability();
+    listenToNetworkSpeed();
+  }
+
+  @override
+  void dispose() {
+    _networkCapabilitySubscription?.cancel();
+    _networkSpeedSubscription?.cancel();
+    super.dispose();
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
@@ -79,9 +91,47 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  void listenToNetworkCapability() {
+    _networkCapabilitySubscription = _nativeLensPlugin.networkCapabilityStream
+        .listen(
+          (NetworkCapability capability) {
+            if (!mounted) return;
+
+            setState(() {
+              _networkCapability = capability;
+
+              if (!capability.isConnected) {
+                _networkSpeedSample = _zeroNetworkSpeedSample();
+              }
+            });
+          },
+          onError: (Object error) {
+            // The one-shot network capability call still provides a fallback
+            // if the stream is unavailable in a test or unsupported platform.
+          },
+        );
+  }
+
+  void listenToNetworkSpeed() {
+    _networkSpeedSubscription = _nativeLensPlugin.networkSpeedStream.listen(
+      (NetworkSpeedSample sample) {
+        if (!mounted) return;
+
+        setState(() {
+          _networkSpeedSample = sample;
+        });
+      },
+      onError: (Object error) {
+        // The example can still show the one-shot capability sections if the
+        // stream is unavailable in a test or unsupported platform environment.
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
@@ -107,6 +157,7 @@ class _MyAppState extends State<MyApp> {
     final List<CameraCapability>? cameraCapabilities = _cameraCapabilities;
     final PowerState? powerState = _powerState;
     final NetworkCapability? networkCapability = _networkCapability;
+    final NetworkSpeedSample? networkSpeedSample = _networkSpeedSample;
 
     if (_errorMessage != null) {
       return Center(
@@ -133,6 +184,10 @@ class _MyAppState extends State<MyApp> {
         .where((MediaCodecCapability codec) => codec.isEncoder)
         .length;
     final int decoderCount = mediaCodecs.length - encoderCount;
+    final bool isNetworkConnected = networkCapability.isConnected;
+    final NetworkSpeedSample? visibleNetworkSpeedSample = isNetworkConnected
+        ? networkSpeedSample
+        : _zeroNetworkSpeedSample();
 
     return ListView(
       children: <Widget>[
@@ -174,8 +229,8 @@ class _MyAppState extends State<MyApp> {
         _SectionTitle(title: 'Network'),
         const SizedBox(height: 16),
         _SummaryRow(
-          label: 'Connected',
-          value: networkCapability.isConnected ? 'Yes' : 'No',
+          label: 'Status',
+          value: isNetworkConnected ? 'Connected' : 'Disconnected',
         ),
         _SummaryRow(label: 'Transport', value: networkCapability.transportType),
         _SummaryRow(
@@ -213,6 +268,33 @@ class _MyAppState extends State<MyApp> {
         _SummaryRow(
           label: 'Bandwidth',
           value: networkCapability.hasHighBandwidth ? 'High' : 'Normal',
+        ),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'App Traffic Speed'),
+        const SizedBox(height: 16),
+        _SummaryRow(
+          label: 'Download',
+          value: _formatSpeed(visibleNetworkSpeedSample?.rxBytesPerSecond),
+        ),
+        _SummaryRow(
+          label: 'Upload',
+          value: _formatSpeed(visibleNetworkSpeedSample?.txBytesPerSecond),
+        ),
+        _SummaryRow(
+          label: 'Received',
+          value: _formatBytes(visibleNetworkSpeedSample?.totalRxBytes),
+        ),
+        _SummaryRow(
+          label: 'Sent',
+          value: _formatBytes(visibleNetworkSpeedSample?.totalTxBytes),
+        ),
+        _SummaryRow(
+          label: 'Supported',
+          value: visibleNetworkSpeedSample == null
+              ? 'Waiting'
+              : visibleNetworkSpeedSample.isSupported
+              ? 'Yes'
+              : 'No',
         ),
         const SizedBox(height: 28),
         _SectionTitle(title: 'Display'),
@@ -289,6 +371,36 @@ class _MyAppState extends State<MyApp> {
     }
 
     return values.join(', ');
+  }
+
+  NetworkSpeedSample _zeroNetworkSpeedSample() {
+    return NetworkSpeedSample(
+      timestampMillis: DateTime.now().millisecondsSinceEpoch,
+      rxBytesPerSecond: 0,
+      txBytesPerSecond: 0,
+      rxKbps: 0,
+      txKbps: 0,
+      totalRxBytes: 0,
+      totalTxBytes: 0,
+      isSupported: true,
+    );
+  }
+
+  String _formatSpeed(int? bytesPerSecond) {
+    if (bytesPerSecond == null) {
+      return 'Waiting';
+    }
+
+    final double kiloBytesPerSecond = bytesPerSecond / 1024;
+    return '${kiloBytesPerSecond.toStringAsFixed(2)} KB/s';
+  }
+
+  String _formatBytes(int? bytes) {
+    if (bytes == null) {
+      return 'Waiting';
+    }
+
+    return '$bytes bytes';
   }
 }
 

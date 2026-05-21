@@ -150,6 +150,41 @@ class MockNativeLensPlatform
       ),
     );
   }
+
+  @override
+  Stream<NetworkCapability> get networkCapabilityStream {
+    return Stream<NetworkCapability>.value(
+      const NetworkCapability(
+        isConnected: true,
+        transportType: 'Wi-Fi',
+        isValidated: true,
+        isMetered: false,
+        hasVpn: false,
+        hasWifi: true,
+        hasCellular: false,
+        hasEthernet: false,
+        hasBluetooth: false,
+        hasLowLatency: false,
+        hasHighBandwidth: false,
+      ),
+    );
+  }
+
+  @override
+  Stream<NetworkSpeedSample> get networkSpeedStream {
+    return Stream<NetworkSpeedSample>.value(
+      const NetworkSpeedSample(
+        timestampMillis: 123456789,
+        rxBytesPerSecond: 2048,
+        txBytesPerSecond: 1024,
+        rxKbps: 16.384,
+        txKbps: 8.192,
+        totalRxBytes: 4096,
+        totalTxBytes: 2048,
+        isSupported: true,
+      ),
+    );
+  }
 }
 
 void main() {
@@ -261,5 +296,31 @@ void main() {
     expect(networkCapability.transportType, 'Wi-Fi');
     expect(networkCapability.isValidated, true);
     expect(networkCapability.hasWifi, true);
+  });
+
+  test('networkCapabilityStream', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NetworkCapability networkCapability =
+        await nativeLensPlugin.networkCapabilityStream.first;
+
+    expect(networkCapability.isConnected, true);
+    expect(networkCapability.transportType, 'Wi-Fi');
+    expect(networkCapability.hasWifi, true);
+  });
+
+  test('networkSpeedStream', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NetworkSpeedSample sample =
+        await nativeLensPlugin.networkSpeedStream.first;
+
+    expect(sample.rxBytesPerSecond, 2048);
+    expect(sample.txBytesPerSecond, 1024);
+    expect(sample.isSupported, true);
   });
 }

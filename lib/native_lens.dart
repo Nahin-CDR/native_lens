@@ -4,6 +4,7 @@ import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
 import 'network_capability.dart';
+import 'network_speed_sample.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
 import 'system_feature.dart';
@@ -13,6 +14,7 @@ export 'display_info.dart';
 export 'media_codec_capability.dart';
 export 'native_sensor.dart';
 export 'network_capability.dart';
+export 'network_speed_sample.dart';
 export 'platform_summary.dart';
 export 'power_state.dart';
 export 'system_feature.dart';
@@ -57,5 +59,21 @@ class NativeLens {
   /// Returns native Android network capability information for the active network.
   Future<NetworkCapability> getNetworkCapability() {
     return NativeLensPlatform.instance.getNetworkCapability();
+  }
+
+  /// Emits native Android network capability updates as the active network changes.
+  ///
+  /// This stream listens to Android network callbacks so Wi-Fi, mobile data,
+  /// VPN, and flight mode changes can update the app without a manual refresh.
+  Stream<NetworkCapability> get networkCapabilityStream {
+    return NativeLensPlatform.instance.networkCapabilityStream;
+  }
+
+  /// Emits app-level upload and download speed samples once per second.
+  ///
+  /// This measures this app's Android UID traffic, not full device internet
+  /// speed and not device-wide network usage.
+  Stream<NetworkSpeedSample> get networkSpeedStream {
+    return NativeLensPlatform.instance.networkSpeedStream;
   }
 }

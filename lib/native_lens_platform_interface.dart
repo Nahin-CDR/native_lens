@@ -6,6 +6,7 @@ import 'media_codec_capability.dart';
 import 'native_lens_method_channel.dart';
 import 'native_sensor.dart';
 import 'network_capability.dart';
+import 'network_speed_sample.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
 import 'system_feature.dart';
@@ -74,5 +75,23 @@ abstract class NativeLensPlatform extends PlatformInterface {
     throw UnimplementedError(
       'getNetworkCapability() has not been implemented.',
     );
+  }
+
+  /// Emits native Android network capability updates as the active network changes.
+  ///
+  /// This stream listens to Android network callbacks so Wi-Fi, mobile data,
+  /// VPN, and flight mode changes can update the app without a manual refresh.
+  Stream<NetworkCapability> get networkCapabilityStream {
+    throw UnimplementedError(
+      'networkCapabilityStream has not been implemented.',
+    );
+  }
+
+  /// Emits app-level upload and download speed samples once per second.
+  ///
+  /// This measures this app's Android UID traffic, not full device internet
+  /// speed and not device-wide network usage.
+  Stream<NetworkSpeedSample> get networkSpeedStream {
+    throw UnimplementedError('networkSpeedStream has not been implemented.');
   }
 }
