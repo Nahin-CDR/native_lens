@@ -3,6 +3,7 @@ import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
+import 'network_capability.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
 import 'system_feature.dart';
@@ -11,6 +12,7 @@ export 'camera_capability.dart';
 export 'display_info.dart';
 export 'media_codec_capability.dart';
 export 'native_sensor.dart';
+export 'network_capability.dart';
 export 'platform_summary.dart';
 export 'power_state.dart';
 export 'system_feature.dart';
@@ -50,5 +52,10 @@ class NativeLens {
   /// Returns native Android battery and power runtime state.
   Future<PowerState> getPowerState() {
     return NativeLensPlatform.instance.getPowerState();
+  }
+
+  /// Returns native Android network capability information for the active network.
+  Future<NetworkCapability> getNetworkCapability() {
+    return NativeLensPlatform.instance.getNetworkCapability();
   }
 }

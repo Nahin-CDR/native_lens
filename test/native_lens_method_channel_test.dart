@@ -5,6 +5,7 @@ import 'package:native_lens/display_info.dart';
 import 'package:native_lens/media_codec_capability.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
 import 'package:native_lens/native_sensor.dart';
+import 'package:native_lens/network_capability.dart';
 import 'package:native_lens/platform_summary.dart';
 import 'package:native_lens/power_state.dart';
 import 'package:native_lens/system_feature.dart';
@@ -117,6 +118,22 @@ void main() {
               'batteryTemperatureCelsius': 31.5,
               'isPowerSaveMode': false,
               'isIgnoringBatteryOptimizations': false,
+            };
+          }
+
+          if (methodCall.method == 'getNetworkCapability') {
+            return <String, Object>{
+              'isConnected': true,
+              'transportType': 'Wi-Fi',
+              'isValidated': true,
+              'isMetered': false,
+              'hasVpn': false,
+              'hasWifi': true,
+              'hasCellular': false,
+              'hasEthernet': false,
+              'hasBluetooth': false,
+              'hasLowLatency': false,
+              'hasHighBandwidth': false,
             };
           }
 
@@ -240,5 +257,22 @@ void main() {
     expect(powerState.batteryTemperatureCelsius, 31.5);
     expect(powerState.isPowerSaveMode, false);
     expect(powerState.isIgnoringBatteryOptimizations, false);
+  });
+
+  test('getNetworkCapability', () async {
+    final NetworkCapability networkCapability = await platform
+        .getNetworkCapability();
+
+    expect(networkCapability.isConnected, true);
+    expect(networkCapability.transportType, 'Wi-Fi');
+    expect(networkCapability.isValidated, true);
+    expect(networkCapability.isMetered, false);
+    expect(networkCapability.hasVpn, false);
+    expect(networkCapability.hasWifi, true);
+    expect(networkCapability.hasCellular, false);
+    expect(networkCapability.hasEthernet, false);
+    expect(networkCapability.hasBluetooth, false);
+    expect(networkCapability.hasLowLatency, false);
+    expect(networkCapability.hasHighBandwidth, false);
   });
 }

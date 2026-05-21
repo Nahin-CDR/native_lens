@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -37,6 +39,7 @@ class NativeLensPlugin :
     private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
     private lateinit var cameraManager: CameraManager
+    private lateinit var connectivityManager: ConnectivityManager
     private lateinit var powerManager: PowerManager
     private lateinit var sensorManager: SensorManager
     private lateinit var windowManager: WindowManager
@@ -48,6 +51,9 @@ class NativeLensPlugin :
         packageManager = applicationContext.packageManager
         cameraManager =
             applicationContext.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        connectivityManager =
+            applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+                as ConnectivityManager
         powerManager =
             applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
         sensorManager =
@@ -68,6 +74,7 @@ class NativeLensPlugin :
             "getMediaCodecs" -> result.success(getMediaCodecs())
             "getCameraCapabilities" -> result.success(getCameraCapabilities())
             "getPowerState" -> result.success(getPowerState())
+            "getNetworkCapability" -> result.success(getNetworkCapability())
             else -> result.notImplemented()
         }
     }
@@ -537,6 +544,116 @@ class NativeLensPlugin :
         }
 
         return powerManager.isIgnoringBatteryOptimizations(applicationContext.packageName)
+    }
+
+    private fun getNetworkCapability(): Map<String, Any> {
+        val capabilities = getActiveNetworkCapabilities()
+        val isConnected = isNetworkConnected(capabilities)
+
+        return mapOf(
+            "isConnected" to isConnected,
+            "transportType" to getTransportTypeName(capabilities),
+            "isValidated" to hasNetworkCapability(
+                capabilities,
+                NetworkCapabilities.NET_CAPABILITY_VALIDATED
+            ),
+            "isMetered" to connectivityManager.isActiveNetworkMetered,
+            "hasVpn" to hasTransport(capabilities, NetworkCapabilities.TRANSPORT_VPN),
+            "hasWifi" to hasTransport(capabilities, NetworkCapabilities.TRANSPORT_WIFI),
+            "hasCellular" to hasTransport(capabilities, NetworkCapabilities.TRANSPORT_CELLULAR),
+            "hasEthernet" to hasTransport(capabilities, NetworkCapabilities.TRANSPORT_ETHERNET),
+            "hasBluetooth" to hasTransport(capabilities, NetworkCapabilities.TRANSPORT_BLUETOOTH),
+            "hasLowLatency" to hasLowLatency(capabilities),
+            "hasHighBandwidth" to hasHighBandwidth(capabilities)
+        )
+    }
+
+    private fun getActiveNetworkCapabilities(): NetworkCapabilities? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return null
+        }
+
+        val activeNetwork = connectivityManager.activeNetwork ?: return null
+        return connectivityManager.getNetworkCapabilities(activeNetwork)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isNetworkConnected(capabilities: NetworkCapabilities?): Boolean {
+        if (capabilities != null) {
+            return hasNetworkCapability(
+                capabilities,
+                NetworkCapabilities.NET_CAPABILITY_INTERNET
+            )
+        }
+
+        val activeNetworkInfo = connectivityManager.activeNetworkInfo
+        return activeNetworkInfo?.isConnected == true
+    }
+
+    private fun getTransportTypeName(capabilities: NetworkCapabilities?): String {
+        if (capabilities == null) {
+            return "Unknown"
+        }
+
+        val transportNames = mutableListOf<String>()
+
+        if (hasTransport(capabilities, NetworkCapabilities.TRANSPORT_VPN)) {
+            transportNames.add("VPN")
+        }
+        if (hasTransport(capabilities, NetworkCapabilities.TRANSPORT_WIFI)) {
+            transportNames.add("Wi-Fi")
+        }
+        if (hasTransport(capabilities, NetworkCapabilities.TRANSPORT_CELLULAR)) {
+            transportNames.add("Cellular")
+        }
+        if (hasTransport(capabilities, NetworkCapabilities.TRANSPORT_ETHERNET)) {
+            transportNames.add("Ethernet")
+        }
+        if (hasTransport(capabilities, NetworkCapabilities.TRANSPORT_BLUETOOTH)) {
+            transportNames.add("Bluetooth")
+        }
+
+        if (transportNames.isEmpty()) {
+            return "Unknown"
+        }
+
+        return transportNames.joinToString(", ")
+    }
+
+    private fun hasTransport(
+        capabilities: NetworkCapabilities?,
+        transportType: Int
+    ): Boolean {
+        return capabilities?.hasTransport(transportType) == true
+    }
+
+    private fun hasNetworkCapability(
+        capabilities: NetworkCapabilities?,
+        capability: Int
+    ): Boolean {
+        return capabilities?.hasCapability(capability) == true
+    }
+
+    private fun hasLowLatency(capabilities: NetworkCapabilities?): Boolean {
+        if (Build.VERSION.SDK_INT < 34) {
+            return false
+        }
+
+        return hasNetworkCapability(
+            capabilities,
+            NetworkCapabilities.NET_CAPABILITY_PRIORITIZE_LATENCY
+        )
+    }
+
+    private fun hasHighBandwidth(capabilities: NetworkCapabilities?): Boolean {
+        if (Build.VERSION.SDK_INT < 34) {
+            return false
+        }
+
+        return hasNetworkCapability(
+            capabilities,
+            NetworkCapabilities.NET_CAPABILITY_PRIORITIZE_BANDWIDTH
+        )
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {

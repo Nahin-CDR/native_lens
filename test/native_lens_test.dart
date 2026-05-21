@@ -131,6 +131,25 @@ class MockNativeLensPlatform
       ),
     );
   }
+
+  @override
+  Future<NetworkCapability> getNetworkCapability() {
+    return Future<NetworkCapability>.value(
+      const NetworkCapability(
+        isConnected: true,
+        transportType: 'Wi-Fi',
+        isValidated: true,
+        isMetered: false,
+        hasVpn: false,
+        hasWifi: true,
+        hasCellular: false,
+        hasEthernet: false,
+        hasBluetooth: false,
+        hasLowLatency: false,
+        hasHighBandwidth: false,
+      ),
+    );
+  }
 }
 
 void main() {
@@ -228,5 +247,19 @@ void main() {
     expect(powerState.isCharging, true);
     expect(powerState.chargingSource, 'USB');
     expect(powerState.batteryHealth, 'Good');
+  });
+
+  test('getNetworkCapability', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NetworkCapability networkCapability = await nativeLensPlugin
+        .getNetworkCapability();
+
+    expect(networkCapability.isConnected, true);
+    expect(networkCapability.transportType, 'Wi-Fi');
+    expect(networkCapability.isValidated, true);
+    expect(networkCapability.hasWifi, true);
   });
 }

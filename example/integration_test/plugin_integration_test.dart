@@ -71,4 +71,12 @@ void main() {
     expect(powerState.batteryLevel >= 0, true);
     expect(powerState.batteryStatus.isNotEmpty, true);
   });
+
+  testWidgets('getNetworkCapability test', (WidgetTester tester) async {
+    final NativeLens plugin = NativeLens();
+    final NetworkCapability networkCapability = await plugin
+        .getNetworkCapability();
+
+    expect(networkCapability.transportType.isNotEmpty, true);
+  });
 }

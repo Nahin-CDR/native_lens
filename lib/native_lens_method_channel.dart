@@ -6,6 +6,7 @@ import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_sensor.dart';
+import 'network_capability.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
 import 'system_feature.dart';
@@ -151,5 +152,20 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     }
 
     return PowerState.fromMap(powerMap);
+  }
+
+  @override
+  Future<NetworkCapability> getNetworkCapability() async {
+    final Map<Object?, Object?>? networkMap = await methodChannel
+        .invokeMapMethod<Object?, Object?>('getNetworkCapability');
+
+    if (networkMap == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_network_capability',
+        message: 'Android returned empty network capability information.',
+      );
+    }
+
+    return NetworkCapability.fromMap(networkMap);
   }
 }

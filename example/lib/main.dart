@@ -24,6 +24,7 @@ class _MyAppState extends State<MyApp> {
   List<MediaCodecCapability>? _mediaCodecs;
   List<CameraCapability>? _cameraCapabilities;
   PowerState? _powerState;
+  NetworkCapability? _networkCapability;
   String? _errorMessage;
 
   @override
@@ -41,6 +42,7 @@ class _MyAppState extends State<MyApp> {
     List<MediaCodecCapability>? mediaCodecs;
     List<CameraCapability>? cameraCapabilities;
     PowerState? powerState;
+    NetworkCapability? networkCapability;
     String? errorMessage;
 
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -52,6 +54,7 @@ class _MyAppState extends State<MyApp> {
       mediaCodecs = await _nativeLensPlugin.getMediaCodecs();
       cameraCapabilities = await _nativeLensPlugin.getCameraCapabilities();
       powerState = await _nativeLensPlugin.getPowerState();
+      networkCapability = await _nativeLensPlugin.getNetworkCapability();
     } on PlatformException {
       errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
@@ -71,6 +74,7 @@ class _MyAppState extends State<MyApp> {
       _mediaCodecs = mediaCodecs;
       _cameraCapabilities = cameraCapabilities;
       _powerState = powerState;
+      _networkCapability = networkCapability;
       _errorMessage = errorMessage;
     });
   }
@@ -102,6 +106,7 @@ class _MyAppState extends State<MyApp> {
     final List<MediaCodecCapability>? mediaCodecs = _mediaCodecs;
     final List<CameraCapability>? cameraCapabilities = _cameraCapabilities;
     final PowerState? powerState = _powerState;
+    final NetworkCapability? networkCapability = _networkCapability;
 
     if (_errorMessage != null) {
       return Center(
@@ -119,7 +124,8 @@ class _MyAppState extends State<MyApp> {
         displayInfo == null ||
         mediaCodecs == null ||
         cameraCapabilities == null ||
-        powerState == null) {
+        powerState == null ||
+        networkCapability == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -163,6 +169,50 @@ class _MyAppState extends State<MyApp> {
           value: powerState.isIgnoringBatteryOptimizations
               ? 'Ignoring'
               : 'Active',
+        ),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'Network'),
+        const SizedBox(height: 16),
+        _SummaryRow(
+          label: 'Connected',
+          value: networkCapability.isConnected ? 'Yes' : 'No',
+        ),
+        _SummaryRow(label: 'Transport', value: networkCapability.transportType),
+        _SummaryRow(
+          label: 'Validated',
+          value: networkCapability.isValidated ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Metered',
+          value: networkCapability.isMetered ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'VPN',
+          value: networkCapability.hasVpn ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Wi-Fi',
+          value: networkCapability.hasWifi ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Cellular',
+          value: networkCapability.hasCellular ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Ethernet',
+          value: networkCapability.hasEthernet ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Bluetooth',
+          value: networkCapability.hasBluetooth ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Low latency',
+          value: networkCapability.hasLowLatency ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Bandwidth',
+          value: networkCapability.hasHighBandwidth ? 'High' : 'Normal',
         ),
         const SizedBox(height: 28),
         _SectionTitle(title: 'Display'),
