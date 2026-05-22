@@ -53,6 +53,32 @@ Create a NativeLens instance:
 final NativeLens nativeLens = NativeLens();
 ```
 
+### Screen Debug Trace
+
+Wrap your screen widgets with `NativeLensScreenTrace` to print the current
+screen name, source file path, and route name during development.
+
+```dart
+NativeLensScreenTrace(
+  screenName: 'ProductDetailsScreen',
+  filePath: 'lib/features/product/product_details_screen.dart',
+  routeName: '/product-details',
+  child: ProductDetailsView(),
+)
+```
+
+On debug builds the console output will be:
+
+```text
+[NativeLens] Screen Debug
+Screen: ProductDetailsScreen
+File: lib/features/product/product_details_screen.dart
+Route: /product-details
+```
+
+The trace is emitted only when asserts are enabled. It does not print in
+release builds.
+
 ### Platform Summary
 
 ```dart

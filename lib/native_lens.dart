@@ -22,6 +22,9 @@ export 'network_speed_sample.dart';
 export 'platform_summary.dart';
 export 'power_state.dart';
 export 'system_feature.dart';
+export 'native_lens_debug.dart';
+export 'native_lens_screen_trace.dart';
+export 'screen_debug_info.dart';
 
 /// Entry point for reading basic native Android information.
 class NativeLens {
@@ -76,8 +79,7 @@ class NativeLens {
     final List<NativeSensor> sensors = await getSensors();
     final DisplayInfo displayInfo = await getDisplayInfo();
     final List<MediaCodecCapability> mediaCodecs = await getMediaCodecs();
-    final List<CameraCapability> cameraCapabilities =
-        await getCameraCapabilities();
+    final List<CameraCapability> cameraCapabilities = await getCameraCapabilities();
     final PowerState powerState = await getPowerState();
     final NetworkCapability networkCapability = await getNetworkCapability();
 
