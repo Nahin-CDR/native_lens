@@ -10,6 +10,7 @@ import 'network_speed_sample.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
 import 'system_feature.dart';
+import 'device_orientation_info.dart';
 
 export 'camera_capability.dart';
 export 'compatibility_summary.dart';
@@ -25,6 +26,7 @@ export 'system_feature.dart';
 export 'native_lens_debug.dart';
 export 'native_lens_screen_trace.dart';
 export 'screen_debug_info.dart';
+export 'device_orientation_info.dart';
 
 /// Entry point for reading basic native Android information.
 class NativeLens {
@@ -179,6 +181,16 @@ class NativeLens {
   /// speed and not device-wide network usage.
   Stream<NetworkSpeedSample> get networkSpeedStream {
     return NativeLensPlatform.instance.networkSpeedStream;
+  }
+
+  /// Returns the current device orientation snapshot.
+  Future<DeviceOrientationInfo> getDeviceOrientation() {
+    return NativeLensPlatform.instance.getDeviceOrientation();
+  }
+
+  /// Emits orientation updates as the device rotates.
+  Stream<DeviceOrientationInfo> get deviceOrientationStream {
+    return NativeLensPlatform.instance.deviceOrientationStream;
   }
 
   String _analyzePowerRisk(NativeLensReport report, List<String> warnings) {

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'camera_capability.dart';
+import 'device_orientation_info.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
@@ -28,6 +29,12 @@ class MethodChannelNativeLens extends NativeLensPlatform {
   @visibleForTesting
   final networkCapabilityEventChannel = const EventChannel(
     'native_lens/network_capability',
+  );
+
+  /// The event channel used to receive live device orientation updates.
+  @visibleForTesting
+  final deviceOrientationEventChannel = const EventChannel(
+    'native_lens/device_orientation',
   );
 
   @override
@@ -193,6 +200,34 @@ class MethodChannelNativeLens extends NativeLensPlatform {
 
       return NetworkCapability.fromMap(<Object?, Object?>{});
     });
+  }
+
+  @override
+  Future<DeviceOrientationInfo> getDeviceOrientation() async {
+    final Map<Object?, Object?>? orientationMap = await methodChannel
+        .invokeMapMethod<Object?, Object?>('getDeviceOrientation');
+
+    if (orientationMap == null) {
+      throw PlatformException(
+        code: 'native_lens_empty_device_orientation',
+        message: 'Android returned empty device orientation information.',
+      );
+    }
+
+    return DeviceOrientationInfo.fromMap(orientationMap);
+  }
+
+  @override
+  Stream<DeviceOrientationInfo> get deviceOrientationStream {
+    return deviceOrientationEventChannel.receiveBroadcastStream().map(
+      (Object? event) {
+        if (event is Map<Object?, Object?>) {
+          return DeviceOrientationInfo.fromMap(event);
+        }
+
+        return DeviceOrientationInfo.fromMap(<Object?, Object?>{});
+      },
+    );
   }
 
   @override

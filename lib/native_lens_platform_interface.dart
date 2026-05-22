@@ -1,6 +1,7 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'camera_capability.dart';
+import 'device_orientation_info.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_method_channel.dart';
@@ -93,5 +94,19 @@ abstract class NativeLensPlatform extends PlatformInterface {
   /// speed and not device-wide network usage.
   Stream<NetworkSpeedSample> get networkSpeedStream {
     throw UnimplementedError('networkSpeedStream has not been implemented.');
+  }
+
+  /// Returns the current device orientation from the Android display.
+  Future<DeviceOrientationInfo> getDeviceOrientation() {
+    throw UnimplementedError(
+      'getDeviceOrientation() has not been implemented.',
+    );
+  }
+
+  /// Emits device orientation updates as the device rotates.
+  Stream<DeviceOrientationInfo> get deviceOrientationStream {
+    throw UnimplementedError(
+      'deviceOrientationStream has not been implemented.',
+    );
   }
 }

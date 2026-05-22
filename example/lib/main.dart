@@ -28,8 +28,10 @@ class _MyAppState extends State<MyApp> {
   NetworkSpeedSample? _networkSpeedSample;
   NativeLensReport? _nativeLensReport;
   CompatibilitySummary? _compatibilitySummary;
+  DeviceOrientationInfo? _deviceOrientation;
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
+  StreamSubscription<DeviceOrientationInfo>? _deviceOrientationSubscription;
   bool _isGeneratingReport = false;
   bool _isAnalyzingCompatibility = false;
   String? _errorMessage;
@@ -40,12 +42,14 @@ class _MyAppState extends State<MyApp> {
     initPlatformState();
     listenToNetworkCapability();
     listenToNetworkSpeed();
+    listenToDeviceOrientation();
   }
 
   @override
   void dispose() {
     _networkCapabilitySubscription?.cancel();
     _networkSpeedSubscription?.cancel();
+    _deviceOrientationSubscription?.cancel();
     super.dispose();
   }
 
@@ -71,6 +75,7 @@ class _MyAppState extends State<MyApp> {
       cameraCapabilities = await _nativeLensPlugin.getCameraCapabilities();
       powerState = await _nativeLensPlugin.getPowerState();
       networkCapability = await _nativeLensPlugin.getNetworkCapability();
+      _deviceOrientation = await _nativeLensPlugin.getDeviceOrientation();
     } on PlatformException {
       errorMessage = 'Failed to load NativeLens details.';
     } on MissingPluginException {
@@ -114,6 +119,22 @@ class _MyAppState extends State<MyApp> {
             // if the stream is unavailable in a test or unsupported platform.
           },
         );
+  }
+
+  void listenToDeviceOrientation() {
+    _deviceOrientationSubscription =
+        _nativeLensPlugin.deviceOrientationStream.listen(
+      (DeviceOrientationInfo orientation) {
+        if (!mounted) return;
+
+        setState(() {
+          _deviceOrientation = orientation;
+        });
+      },
+      onError: (Object error) {
+        // Orientation updates are optional and may not be supported on all devices.
+      },
+    );
   }
 
   void listenToNetworkSpeed() {
@@ -213,6 +234,7 @@ class _MyAppState extends State<MyApp> {
     final List<CameraCapability>? cameraCapabilities = _cameraCapabilities;
     final PowerState? powerState = _powerState;
     final NetworkCapability? networkCapability = _networkCapability;
+    final DeviceOrientationInfo? deviceOrientation = _deviceOrientation;
     final NetworkSpeedSample? networkSpeedSample = _networkSpeedSample;
     final NativeLensReport? nativeLensReport = _nativeLensReport;
     final CompatibilitySummary? compatibilitySummary = _compatibilitySummary;
@@ -424,6 +446,29 @@ class _MyAppState extends State<MyApp> {
         _SummaryRow(
           label: 'Bandwidth',
           value: networkCapability.hasHighBandwidth ? 'High' : 'Normal',
+        ),
+        const SizedBox(height: 28),
+        _SectionTitle(title: 'Orientation'),
+        const SizedBox(height: 16),
+        _SummaryRow(
+          label: 'Orientation',
+          value: deviceOrientation?.orientationName ?? 'Unknown',
+        ),
+        _SummaryRow(
+          label: 'Degrees',
+          value: deviceOrientation?.rotationDegrees.toString() ?? 'Unknown',
+        ),
+        _SummaryRow(
+          label: 'Portrait',
+          value: deviceOrientation?.isPortrait == true ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Landscape',
+          value: deviceOrientation?.isLandscape == true ? 'Yes' : 'No',
+        ),
+        _SummaryRow(
+          label: 'Source',
+          value: deviceOrientation?.source ?? 'Unknown',
         ),
         const SizedBox(height: 28),
         _SectionTitle(title: 'App Traffic Speed'),

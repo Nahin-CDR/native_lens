@@ -140,6 +140,29 @@ stream.listen((NetworkSpeedSample sample) {
 `networkSpeedStream` measures this app UID traffic with Android TrafficStats. It
 is not a full internet speed test and does not use device-wide network stats.
 
+### Device Orientation
+
+Get the current device orientation snapshot from Android:
+
+```dart
+final DeviceOrientationInfo orientation =
+    await nativeLens.getDeviceOrientation();
+
+print(orientation.orientationName);
+print(orientation.rotationDegrees);
+print(orientation.isPortrait);
+print(orientation.isLandscape);
+```
+
+Listen for live orientation updates:
+
+```dart
+nativeLens.deviceOrientationStream.listen((DeviceOrientationInfo orientation) {
+  print('Orientation: ${orientation.orientationName}');
+  print('Rotation degrees: ${orientation.rotationDegrees}');
+});
+```
+
 ## Privacy
 
 NativeLens focuses on device capability and runtime state. It does not collect:

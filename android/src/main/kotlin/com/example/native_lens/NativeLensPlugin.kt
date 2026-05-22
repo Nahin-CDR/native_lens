@@ -25,6 +25,7 @@ import android.os.PowerManager
 import android.os.Process
 import android.util.DisplayMetrics
 import android.view.Display
+import android.view.OrientationEventListener
 import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
@@ -44,6 +45,7 @@ class NativeLensPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var networkSpeedChannel: EventChannel
     private lateinit var networkCapabilityChannel: EventChannel
+    private lateinit var deviceOrientationChannel: EventChannel
     private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
     private lateinit var cameraManager: CameraManager
@@ -54,7 +56,9 @@ class NativeLensPlugin :
     private val networkSpeedHandler = Handler(Looper.getMainLooper())
     private var networkSpeedEvents: EventChannel.EventSink? = null
     private var networkCapabilityEvents: EventChannel.EventSink? = null
+    private var deviceOrientationEvents: EventChannel.EventSink? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var orientationEventListener: OrientationEventListener? = null
     private var previousRxBytes = 0L
     private var previousTxBytes = 0L
     private var previousSpeedSampleTimeMillis = 0L
@@ -102,6 +106,22 @@ class NativeLensPlugin :
                 }
             }
         )
+        deviceOrientationChannel =
+            EventChannel(flutterPluginBinding.binaryMessenger, "native_lens/device_orientation")
+        deviceOrientationChannel.setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(
+                    arguments: Any?,
+                    events: EventChannel.EventSink
+                ) {
+                    startDeviceOrientationStream(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopDeviceOrientationStream()
+                }
+            }
+        )
         applicationContext = flutterPluginBinding.applicationContext
         packageManager = applicationContext.packageManager
         cameraManager =
@@ -130,6 +150,7 @@ class NativeLensPlugin :
             "getCameraCapabilities" -> result.success(getCameraCapabilities())
             "getPowerState" -> result.success(getPowerState())
             "getNetworkCapability" -> result.success(getNetworkCapability())
+            "getDeviceOrientation" -> result.success(getDeviceOrientation())
             else -> result.notImplemented()
         }
     }
@@ -251,6 +272,133 @@ class NativeLensPlugin :
             "supportedRefreshRates" to getSupportedRefreshRates(display),
             "isHdrSupported" to supportedHdrTypes.isNotEmpty(),
             "supportedHdrTypes" to supportedHdrTypes
+        )
+    }
+
+    private fun getDeviceOrientation(): Map<String, Any> {
+        val display = getCurrentDisplay()
+        if (display == null) {
+            return createDeviceOrientation(
+                orientationName = "unknown",
+                rotationDegrees = -1,
+                isPortrait = false,
+                isLandscape = false,
+                source = "display",
+                timestampMillis = System.currentTimeMillis()
+            )
+        }
+
+        val rotation = display.rotation
+        val orientationName = getOrientationNameFromRotation(rotation)
+        val rotationDegrees = getRotationDegreesFromDisplay(rotation)
+
+        return createDeviceOrientation(
+            orientationName = orientationName,
+            rotationDegrees = rotationDegrees,
+            isPortrait = orientationName == "portraitUp" || orientationName == "portraitDown",
+            isLandscape = orientationName == "landscapeLeft" || orientationName == "landscapeRight",
+            source = "display",
+            timestampMillis = System.currentTimeMillis()
+        )
+    }
+
+    private fun getOrientationNameFromRotation(rotation: Int): String {
+        return when (rotation) {
+            Display.ROTATION_0 -> "portraitUp"
+            Display.ROTATION_90 -> "landscapeRight"
+            Display.ROTATION_180 -> "portraitDown"
+            Display.ROTATION_270 -> "landscapeLeft"
+            else -> "unknown"
+        }
+    }
+
+    private fun getRotationDegreesFromDisplay(rotation: Int): Int {
+        return when (rotation) {
+            Display.ROTATION_0 -> 0
+            Display.ROTATION_90 -> 90
+            Display.ROTATION_180 -> 180
+            Display.ROTATION_270 -> 270
+            else -> -1
+        }
+    }
+
+    private fun startDeviceOrientationStream(events: EventChannel.EventSink) {
+        deviceOrientationEvents = events
+        orientationEventListener = object : OrientationEventListener(applicationContext) {
+            override fun onOrientationChanged(orientation: Int) {
+                val deviceOrientation = if (orientation == ORIENTATION_UNKNOWN) {
+                    createDeviceOrientation(
+                        orientationName = "unknown",
+                        rotationDegrees = -1,
+                        isPortrait = false,
+                        isLandscape = false,
+                        source = "orientation",
+                        timestampMillis = System.currentTimeMillis()
+                    )
+                } else {
+                    val orientationName = getOrientationNameFromDegrees(orientation)
+                    createDeviceOrientation(
+                        orientationName = orientationName,
+                        rotationDegrees = orientation,
+                        isPortrait = orientationName == "portraitUp" || orientationName == "portraitDown",
+                        isLandscape = orientationName == "landscapeLeft" || orientationName == "landscapeRight",
+                        source = "orientation",
+                        timestampMillis = System.currentTimeMillis()
+                    )
+                }
+
+                deviceOrientationEvents?.success(deviceOrientation)
+            }
+        }
+
+        if (!orientationEventListener!!.canDetectOrientation()) {
+            events.success(
+                createDeviceOrientation(
+                    orientationName = "unknown",
+                    rotationDegrees = -1,
+                    isPortrait = false,
+                    isLandscape = false,
+                    source = "orientation",
+                    timestampMillis = System.currentTimeMillis()
+                )
+            )
+            return
+        }
+
+        orientationEventListener!!.enable()
+    }
+
+    private fun stopDeviceOrientationStream() {
+        orientationEventListener?.disable()
+        orientationEventListener = null
+        deviceOrientationEvents = null
+    }
+
+    private fun getOrientationNameFromDegrees(orientation: Int): String {
+        return when (orientation) {
+            in 315..359, in 0..45 -> "portraitUp"
+            in 46..134 -> "landscapeRight"
+            in 135..224 -> "portraitDown"
+            in 225..314 -> "landscapeLeft"
+            else -> "unknown"
+        }
+    }
+
+    private fun createDeviceOrientation(
+        orientationName: String,
+        rotationDegrees: Int,
+        isPortrait: Boolean,
+        isLandscape: Boolean,
+        source: String,
+        timestampMillis: Long
+    ): Map<String, Any> {
+        return mapOf(
+            "orientationName" to orientationName,
+            "rotationDegrees" to rotationDegrees,
+            "isPortrait" to isPortrait,
+            "isLandscape" to isLandscape,
+            "source" to source,
+            "timestampMillis" to timestampMillis
         )
     }
 
@@ -922,8 +1070,10 @@ class NativeLensPlugin :
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopNetworkCapabilityStream()
         stopNetworkSpeedStream()
+        stopDeviceOrientationStream()
         networkCapabilityChannel.setStreamHandler(null)
         networkSpeedChannel.setStreamHandler(null)
+        deviceOrientationChannel.setStreamHandler(null)
         channel.setMethodCallHandler(null)
     }
 }

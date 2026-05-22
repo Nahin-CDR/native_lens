@@ -152,6 +152,34 @@ class MockNativeLensPlatform
   }
 
   @override
+  Future<DeviceOrientationInfo> getDeviceOrientation() {
+    return Future<DeviceOrientationInfo>.value(
+      const DeviceOrientationInfo(
+        orientationName: 'portraitUp',
+        rotationDegrees: 0,
+        isPortrait: true,
+        isLandscape: false,
+        source: 'display',
+        timestampMillis: 123456789,
+      ),
+    );
+  }
+
+  @override
+  Stream<DeviceOrientationInfo> get deviceOrientationStream {
+    return Stream<DeviceOrientationInfo>.value(
+      const DeviceOrientationInfo(
+        orientationName: 'landscapeRight',
+        rotationDegrees: 90,
+        isPortrait: false,
+        isLandscape: true,
+        source: 'orientation',
+        timestampMillis: 123456790,
+      ),
+    );
+  }
+
+  @override
   Stream<NetworkCapability> get networkCapabilityStream {
     return Stream<NetworkCapability>.value(
       const NetworkCapability(
@@ -368,5 +396,33 @@ void main() {
     expect(sample.rxBytesPerSecond, 2048);
     expect(sample.txBytesPerSecond, 1024);
     expect(sample.isSupported, true);
+  });
+
+  test('getDeviceOrientation', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final DeviceOrientationInfo orientation =
+        await nativeLensPlugin.getDeviceOrientation();
+
+    expect(orientation.orientationName, 'portraitUp');
+    expect(orientation.rotationDegrees, 0);
+    expect(orientation.isPortrait, true);
+    expect(orientation.isLandscape, false);
+  });
+
+  test('deviceOrientationStream', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final DeviceOrientationInfo orientation =
+        await nativeLensPlugin.deviceOrientationStream.first;
+
+    expect(orientation.orientationName, 'landscapeRight');
+    expect(orientation.rotationDegrees, 90);
+    expect(orientation.isPortrait, false);
+    expect(orientation.isLandscape, true);
   });
 }
