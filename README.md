@@ -30,7 +30,7 @@ Add NativeLens to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  native_lens: ^0.1.0
+  native_lens: ^0.2.0
 ```
 
 Then run:
@@ -52,6 +52,13 @@ Create a NativeLens instance:
 ```dart
 final NativeLens nativeLens = NativeLens();
 ```
+
+## What's new in v0.2.0
+
+- Screen Debug Trace: debug-only assert-based screen traces for development.
+- Device Orientation APIs: one-shot `getDeviceOrientation()` and `deviceOrientationStream`.
+- Example app: refactored into a professional diagnostics dashboard UI.
+- Android fix: use `Surface` rotation constants to resolve build issues.
 
 ### Screen Debug Trace
 

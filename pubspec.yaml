@@ -1,6 +1,6 @@
 name: native_lens
 description: "A Flutter Android capability intelligence SDK using Kotlin Platform Channels for native device diagnostics, runtime reports, and compatibility analysis."
-version: 0.1.0
+version: 0.2.0
 homepage: https://github.com/Nahin-CDR/native_lens
 repository: https://github.com/Nahin-CDR/native_lens
 issue_tracker: https://github.com/Nahin-CDR/native_lens/issues

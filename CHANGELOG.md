@@ -1,3 +1,13 @@
+## 0.2.0
+
+Release date: 2026-05-23
+
+- Added Screen Debug Trace utility
+- Added native device orientation snapshot API
+- Added native device orientation live stream
+- Improved example app into a professional diagnostics dashboard
+- Fixed Android orientation build issue by using Surface rotation constants
+
 ## 0.1.0
 
 Initial pre-release for Android.
