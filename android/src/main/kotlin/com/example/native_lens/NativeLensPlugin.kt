@@ -26,6 +26,7 @@ import android.os.Process
 import android.util.DisplayMetrics
 import android.view.Display
 import android.view.OrientationEventListener
+import android.view.Surface
 import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
@@ -304,20 +305,20 @@ class NativeLensPlugin :
 
     private fun getOrientationNameFromRotation(rotation: Int): String {
         return when (rotation) {
-            Display.ROTATION_0 -> "portraitUp"
-            Display.ROTATION_90 -> "landscapeRight"
-            Display.ROTATION_180 -> "portraitDown"
-            Display.ROTATION_270 -> "landscapeLeft"
+            Surface.ROTATION_0 -> "portraitUp"
+            Surface.ROTATION_90 -> "landscapeRight"
+            Surface.ROTATION_180 -> "portraitDown"
+            Surface.ROTATION_270 -> "landscapeLeft"
             else -> "unknown"
         }
     }
 
     private fun getRotationDegreesFromDisplay(rotation: Int): Int {
         return when (rotation) {
-            Display.ROTATION_0 -> 0
-            Display.ROTATION_90 -> 90
-            Display.ROTATION_180 -> 180
-            Display.ROTATION_270 -> 270
+            Surface.ROTATION_0 -> 0
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
             else -> -1
         }
     }
