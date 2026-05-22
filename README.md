@@ -204,6 +204,11 @@ It reads Camera2 metadata only and does not open the camera or capture media.
 - No dashboard graphs yet.
 - No iOS, macOS, Windows, Linux, or web implementation yet.
 
+## Author
+
+- Portfolio: https://bynahin.onrender.com/
+- Pub.dev: https://pub.dev/packages/native_lens
+
 ## Repository
 
 - Homepage: https://github.com/Nahin-CDR/native_lens

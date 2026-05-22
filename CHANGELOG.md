@@ -1,3 +1,10 @@
+## 0.2.1
+
+Release date: 2026-05-23
+
+- Updated package homepage to personal portfolio website
+- Added author/portfolio link to README
+
 ## 0.2.0
 
 Release date: 2026-05-23
