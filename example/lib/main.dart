@@ -339,6 +339,10 @@ class _MyAppState extends State<MyApp> {
 
           const SizedBox(height: 16),
 
+          _datasetExportSection(),
+
+          const SizedBox(height: 16),
+
           _sectionCard(
             title: 'Orientation',
             child: Column(
@@ -453,7 +457,64 @@ class _MyAppState extends State<MyApp> {
     return '${kiloBytesPerSecond.toStringAsFixed(2)} KB/s';
   }
 
-  
+  Widget _datasetExportSection() {
+    return _sectionCard(
+      title: 'Dataset Export',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Generate the current NativeLens row and copy it as JSON or CSV.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: <Widget>[
+              FilledButton.tonalIcon(
+                onPressed: () => _copyDatasetExport(format: 'json'),
+                icon: const Icon(Icons.copy_all_rounded),
+                label: const Text('Copy Dataset JSON'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _copyDatasetExport(format: 'csv'),
+                icon: const Icon(Icons.table_chart_rounded),
+                label: const Text('Copy Dataset CSV'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _copyDatasetExport({required String format}) async {
+    try {
+      final NativeLensDatasetRow row = await _nativeLensPlugin.generateDatasetRow();
+      final String payload = format == 'csv'
+          ? NativeLensDatasetExporter.toCsv(<NativeLensDatasetRow>[row])
+          : NativeLensDatasetExporter.toJson(row);
+
+      await Clipboard.setData(ClipboardData(text: payload));
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Copied dataset ${format.toUpperCase()} to clipboard.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to copy dataset $format: $error'),
+        ),
+      );
+    }
+  }
 }
 
 Widget _gaugeCard({
