@@ -16,6 +16,7 @@ export 'camera_capability.dart';
 export 'compatibility_summary.dart';
 export 'display_info.dart';
 export 'media_codec_capability.dart';
+export 'native_lens_dataset_row.dart';
 export 'native_sensor.dart';
 export 'native_lens_report.dart';
 export 'network_capability.dart';
