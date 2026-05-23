@@ -39,6 +39,11 @@ Then run:
 flutter pub get
 ```
 
+## Platform Support
+
+- Android: deep native capability support for platform summary, sensors, display, media codecs, camera capabilities, power state, and network diagnostics.
+- iOS: initial foundation support for platform summary, power state, network capability, and device orientation, with safe fallbacks for unsupported modules.
+
 ## Basic Usage
 
 Import the package:

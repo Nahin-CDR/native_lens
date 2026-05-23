@@ -1,3 +1,10 @@
+## 0.3.0
+
+Unreleased
+
+- Added initial iOS foundation support for platform summary, power state, network capability, and device orientation.
+- Returned safe fallback values on iOS for unsupported modules.
+
 ## 0.2.1
 
 Release date: 2026-05-23

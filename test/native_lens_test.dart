@@ -215,6 +215,44 @@ class MockNativeLensPlatform
   }
 }
 
+class MockIosFallbackPlatform extends MockNativeLensPlatform {
+  @override
+  Future<List<SystemFeature>> getSystemFeatures() {
+    return Future<List<SystemFeature>>.value(<SystemFeature>[]);
+  }
+
+  @override
+  Future<List<NativeSensor>> getSensors() {
+    return Future<List<NativeSensor>>.value(<NativeSensor>[]);
+  }
+
+  @override
+  Future<DisplayInfo> getDisplayInfo() {
+    return Future<DisplayInfo>.value(
+      const DisplayInfo(
+        widthPixels: 375,
+        heightPixels: 812,
+        density: 3.0,
+        densityDpi: 480,
+        refreshRate: 60.0,
+        supportedRefreshRates: <double>[60.0],
+        isHdrSupported: false,
+        supportedHdrTypes: <String>[],
+      ),
+    );
+  }
+
+  @override
+  Future<List<MediaCodecCapability>> getMediaCodecs() {
+    return Future<List<MediaCodecCapability>>.value(<MediaCodecCapability>[]);
+  }
+
+  @override
+  Future<List<CameraCapability>> getCameraCapabilities() {
+    return Future<List<CameraCapability>>.value(<CameraCapability>[]);
+  }
+}
+
 void main() {
   final NativeLensPlatform initialPlatform = NativeLensPlatform.instance;
 
@@ -345,6 +383,22 @@ void main() {
     expect(report.generatedAtMillis, greaterThanOrEqualTo(beforeReport));
     expect(reportMap['generatedAtMillis'], report.generatedAtMillis);
     expect(report.toString(), contains('NativeLensReport'));
+  });
+
+  test('generateReport with iOS fallback values', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockIosFallbackPlatform fakePlatform = MockIosFallbackPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensReport report = await nativeLensPlugin.generateReport();
+
+    expect(report.systemFeatures, isEmpty);
+    expect(report.sensors, isEmpty);
+    expect(report.mediaCodecs, isEmpty);
+    expect(report.cameraCapabilities, isEmpty);
+    expect(report.displayInfo.widthPixels, 375);
+    expect(report.powerState.isCharging, true);
+    expect(report.networkCapability.transportType, 'Wi-Fi');
   });
 
   test('analyzeCompatibility', () async {

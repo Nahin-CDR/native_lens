@@ -7,7 +7,9 @@ issue_tracker: https://github.com/Nahin-CDR/native_lens/issues
 topics:
   - flutter-plugin
   - android
+  - ios
   - kotlin
+  - swift
   - diagnostics
   - platform-channel
 
@@ -44,6 +46,8 @@ flutter:
     platforms:
       android:
         package: com.example.native_lens
+        pluginClass: NativeLensPlugin
+      ios:
         pluginClass: NativeLensPlugin
 
   # To add assets to your plugin package, add an assets section, like this:
