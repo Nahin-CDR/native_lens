@@ -308,43 +308,31 @@ class _MyAppState extends State<MyApp> {
             spacing: 12,
             runSpacing: 12,
             children: <Widget>[
-                _metricCard(
-                context,
+              _gaugeCard(
                 title: 'Compatibility',
                 value: compatibilitySummary == null
-                  ? 'Waiting'
-                  : '${compatibilitySummary.overallScore}',
+                    ? 'Wait'
+                    : '${compatibilitySummary.overallScore}',
+                subtitle: compatibilitySummary?.overallLevel ?? 'Analyze',
                 progress: compatibilitySummary == null
-                    ? null
-                    : (compatibilitySummary.overallScore / 100.0),
-                subtitle: compatibilitySummary?.overallLevel,
-                ),
-              _metricCard(
-                context,
-                title: 'Sensors',
-                value: sensors.length.toString(),
+                    ? 0
+                    : compatibilitySummary.overallScore / 100.0,
               ),
-              _metricCard(
-                context,
-                title: 'Cameras',
-                value: cameraCapabilities.length.toString(),
-              ),
-              _metricCard(
-                context,
-                title: 'Codecs',
-                value: mediaCodecs.length.toString(),
-              ),
-              _metricCard(
-                context,
+              _gaugeCard(
                 title: 'Battery',
                 value: '${powerState.batteryLevel}%',
+                subtitle: 'Live battery level',
                 progress: powerState.batteryLevel / 100.0,
               ),
-              _metricCard(
-                context,
-                title: 'Network',
-                value: isNetworkConnected ? networkCapability.transportType : 'Disconnected',
-                subtitle: isNetworkConnected ? 'Online' : 'Offline',
+              _capabilityChartCard(
+                sensors: sensors,
+                cameras: cameraCapabilities,
+                codecs: mediaCodecs,
+                features: features,
+              ),
+              _networkSpeedChartCard(
+                visibleNetworkSpeedSample: visibleNetworkSpeedSample,
+                isConnected: isNetworkConnected,
               ),
             ],
           ),
@@ -468,33 +456,173 @@ class _MyAppState extends State<MyApp> {
   
 }
 
-Widget _metricCard(BuildContext context,
-    {required String title,
-    required String value,
-    double? progress,
-    String? subtitle}) {
+Widget _gaugeCard({
+  required String title,
+  required String value,
+  required String subtitle,
+  required double progress,
+}) {
   return SizedBox(
-    width: 160,
+    width: 180,
     child: Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(value, style: Theme.of(context).textTheme.headlineSmall),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-            ],
-            if (progress != null) ...[
-              const SizedBox(height: 8),
-              LinearProgressIndicator(value: progress),
-            ],
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            Center(
+              child: SizedBox(
+                width: 72,
+                height: 72,
+                child: CircularProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  strokeWidth: 8,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: Text(
+                value,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Center(
+              child: Text(
+                subtitle,
+                style: const TextStyle(fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ),
           ],
         ),
       ),
+    ),
+  );
+}
+
+Widget _capabilityChartCard({
+  required List<NativeSensor> sensors,
+  required List<CameraCapability> cameras,
+  required List<MediaCodecCapability> codecs,
+  required List<SystemFeature> features,
+}) {
+  final int maxCount = [
+    sensors.length,
+    cameras.length,
+    codecs.length,
+    features.length,
+    1,
+  ].reduce((int a, int b) => a > b ? a : b);
+
+  return SizedBox(
+    width: 280,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('Capability Counts',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            _capabilityBarRow('Sensors', sensors.length, maxCount),
+            _capabilityBarRow('Cameras', cameras.length, maxCount),
+            _capabilityBarRow('Codecs', codecs.length, maxCount),
+            _capabilityBarRow('Features', features.length, maxCount),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _capabilityBarRow(String label, int count, int maxCount) {
+  final double fraction = count / maxCount;
+
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Text(label, style: const TextStyle(fontSize: 13)),
+            Text('$count', style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LinearProgressIndicator(value: fraction.clamp(0.0, 1.0)),
+      ],
+    ),
+  );
+}
+
+Widget _networkSpeedChartCard({
+  required NetworkSpeedSample? visibleNetworkSpeedSample,
+  required bool isConnected,
+}) {
+  final int rx = visibleNetworkSpeedSample?.rxBytesPerSecond ?? 0;
+  final int tx = visibleNetworkSpeedSample?.txBytesPerSecond ?? 0;
+  final int maxSpeed = [rx, tx, 1].reduce((int a, int b) => a > b ? a : b);
+
+  return SizedBox(
+    width: 280,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                const Text('Live Network Speed',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  isConnected ? 'Live' : 'Offline',
+                  style: TextStyle(
+                    color: isConnected ? Colors.green : Colors.grey,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _speedBarRow('Download', rx, maxSpeed),
+            _speedBarRow('Upload', tx, maxSpeed),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _speedBarRow(String label, int bytesPerSecond, int maxSpeed) {
+  final double fraction = maxSpeed == 0 ? 0 : bytesPerSecond / maxSpeed;
+
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Text(label, style: const TextStyle(fontSize: 13)),
+            Text(
+              '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LinearProgressIndicator(value: fraction.clamp(0.0, 1.0)),
+      ],
     ),
   );
 }
