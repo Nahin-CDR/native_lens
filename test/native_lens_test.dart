@@ -253,6 +253,89 @@ class MockIosFallbackPlatform extends MockNativeLensPlatform {
   }
 }
 
+class MockHevcPlatform extends MockNativeLensPlatform {
+  @override
+  Future<List<MediaCodecCapability>> getMediaCodecs() {
+    return Future<List<MediaCodecCapability>>.value(
+      const <MediaCodecCapability>[
+        MediaCodecCapability(
+          name: 'c2.android.hevc.encoder',
+          isEncoder: true,
+          supportedTypes: <String>['video/hevc'],
+          isHardwareAccelerated: true,
+          isSoftwareOnly: false,
+          isVendor: false,
+          supportedVideoTypes: <String>['video/hevc'],
+          supportedAudioTypes: <String>[],
+        ),
+      ],
+    );
+  }
+}
+
+class MockHighRiskPlatform extends MockNativeLensPlatform {
+  @override
+  Future<PowerState> getPowerState() {
+    return Future<PowerState>.value(
+      const PowerState(
+        batteryLevel: 10,
+        isCharging: false,
+        chargingSource: 'Not charging',
+        batteryHealth: 'Good',
+        batteryStatus: 'Discharging',
+        batteryTemperatureCelsius: 28.0,
+        isPowerSaveMode: true,
+        isIgnoringBatteryOptimizations: false,
+      ),
+    );
+  }
+
+  @override
+  Future<NetworkCapability> getNetworkCapability() {
+    return Future<NetworkCapability>.value(
+      const NetworkCapability(
+        isConnected: false,
+        transportType: 'Disconnected',
+        isValidated: false,
+        isMetered: true,
+        hasVpn: false,
+        hasWifi: false,
+        hasCellular: false,
+        hasEthernet: false,
+        hasBluetooth: false,
+        hasLowLatency: false,
+        hasHighBandwidth: false,
+      ),
+    );
+  }
+
+  @override
+  Future<DisplayInfo> getDisplayInfo() {
+    return Future<DisplayInfo>.value(
+      const DisplayInfo(
+        widthPixels: 1080,
+        heightPixels: 2400,
+        density: 2.75,
+        densityDpi: 440,
+        refreshRate: 30,
+        supportedRefreshRates: <double>[30],
+        isHdrSupported: false,
+        supportedHdrTypes: <String>[],
+      ),
+    );
+  }
+
+  @override
+  Future<List<MediaCodecCapability>> getMediaCodecs() {
+    return Future<List<MediaCodecCapability>>.value(<MediaCodecCapability>[]);
+  }
+
+  @override
+  Future<List<CameraCapability>> getCameraCapabilities() {
+    return Future<List<CameraCapability>>.value(<CameraCapability>[]);
+  }
+}
+
 void main() {
   final NativeLensPlatform initialPlatform = NativeLensPlatform.instance;
 
@@ -424,6 +507,59 @@ void main() {
     );
     expect(summaryMap['overallScore'], summary.overallScore);
     expect(summary.toString(), contains('CompatibilitySummary'));
+  });
+
+  test('generateDatasetRow returns a valid row', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final int beforeGeneration = DateTime.now().millisecondsSinceEpoch;
+    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+
+    expect(row.isValid, isTrue);
+    expect(row.schemaVersion, '1.0.0');
+    expect(row.platform, 'android');
+    expect(row.batteryLevel, 88);
+    expect(row.networkConnected, isTrue);
+    expect(row.networkValidated, isTrue);
+    expect(row.cameraCount, 1);
+    expect(row.sensorCount, 1);
+    expect(row.codecCount, 2);
+    expect(row.overallScore, 85);
+    expect(row.riskLevel, 'low');
+    expect(row.labelSource, 'rule_based_v1');
+    expect(row.createdAtMillis, greaterThanOrEqualTo(beforeGeneration));
+  });
+
+  test('generateDatasetRow detects HEVC encoder when available', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockHevcPlatform fakePlatform = MockHevcPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+
+    expect(row.hasHevcEncoder, isTrue);
+  });
+
+  test('generateDatasetRow detects missing HEVC encoder', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+
+    expect(row.hasHevcEncoder, isFalse);
+  });
+
+  test('generateDatasetRow normalizes risk level to high for limited results', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockHighRiskPlatform fakePlatform = MockHighRiskPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+
+    expect(row.riskLevel, 'high');
   });
 
   test('networkCapabilityStream', () async {

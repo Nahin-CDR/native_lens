@@ -1,7 +1,10 @@
+import 'dart:io' show Platform;
+
 import 'camera_capability.dart';
 import 'compatibility_summary.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
+import 'native_lens_dataset_row.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_lens_report.dart';
 import 'native_sensor.dart';
@@ -168,6 +171,33 @@ class NativeLens {
     );
   }
 
+  /// Converts the current NativeLens report and compatibility analysis into a
+  /// stable dataset row.
+  Future<NativeLensDatasetRow> generateDatasetRow() async {
+    final NativeLensReport report = await generateReport();
+    final CompatibilitySummary compatibilitySummary = await analyzeCompatibility();
+
+    return NativeLensDatasetRow(
+      schemaVersion: '1.0.0',
+      platform: _detectPlatform(report),
+      batteryLevel: report.powerState.batteryLevel,
+      isCharging: report.powerState.isCharging,
+      isPowerSaveMode: report.powerState.isPowerSaveMode,
+      networkConnected: report.networkCapability.isConnected,
+      networkValidated: report.networkCapability.isValidated,
+      networkMetered: report.networkCapability.isMetered,
+      hasHevcEncoder: _hasHevcEncoder(report.mediaCodecs),
+      maxRefreshRate: _maxRefreshRate(report.displayInfo),
+      cameraCount: report.cameraCapabilities.length,
+      sensorCount: report.sensors.length,
+      codecCount: report.mediaCodecs.length,
+      overallScore: compatibilitySummary.overallScore,
+      riskLevel: _normalizeRiskLevel(compatibilitySummary.overallLevel),
+      labelSource: 'rule_based_v1',
+      createdAtMillis: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
   /// Emits native Android network capability updates as the active network changes.
   ///
   /// This stream listens to Android network callbacks so Wi-Fi, mobile data,
@@ -325,6 +355,68 @@ class NativeLens {
     return report.mediaCodecs.any((MediaCodecCapability codec) {
       return codec.isEncoder && codec.supportedTypes.contains(mimeType);
     });
+  }
+
+  bool _hasHevcEncoder(List<MediaCodecCapability> codecs) {
+    return codecs.any((MediaCodecCapability codec) {
+      final List<String> supportedTypes = <String>[...codec.supportedTypes];
+      if (codec.supportedVideoTypes.isNotEmpty) {
+        supportedTypes.addAll(codec.supportedVideoTypes);
+      }
+
+      return supportedTypes.any((String supportedType) {
+        final String normalizedType = supportedType.toLowerCase();
+        return normalizedType.contains('hevc') || normalizedType.contains('h265');
+      });
+    });
+  }
+
+  double _maxRefreshRate(DisplayInfo displayInfo) {
+    if (displayInfo.refreshRate > 0) {
+      return displayInfo.refreshRate;
+    }
+
+    if (displayInfo.supportedRefreshRates.isNotEmpty) {
+      return displayInfo.supportedRefreshRates
+          .reduce((double a, double b) => a > b ? a : b);
+    }
+
+    return 0;
+  }
+
+  String _detectPlatform(NativeLensReport report) {
+    final String operatingSystem = Platform.operatingSystem;
+    if (operatingSystem == 'android') {
+      return 'android';
+    }
+
+    if (operatingSystem == 'ios') {
+      return 'ios';
+    }
+
+    if (report.platformSummary.androidSdk > 0) {
+      return 'android';
+    }
+
+    return 'ios';
+  }
+
+  String _normalizeRiskLevel(String overallLevel) {
+    final String normalizedLevel = overallLevel.toLowerCase();
+
+    if (normalizedLevel == 'excellent' || normalizedLevel == 'good') {
+      return 'low';
+    }
+
+    if (normalizedLevel == 'fair') {
+      return 'medium';
+    }
+
+    if (normalizedLevel == 'limited') {
+      return 'high';
+    }
+
+    return 'unknown';
   }
 
   String _getOverallLevel(int score) {
