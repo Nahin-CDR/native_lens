@@ -31,7 +31,7 @@ Add NativeLens to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  native_lens: ^0.3.0
+  native_lens: ^0.4.0
 ```
 
 Then run:
@@ -130,6 +130,35 @@ print(summary.recommendations);
 The compatibility summary is generated locally with simple Dart rules. It does
 not call an AI API, backend, paid service, or remote model.
 
+### Dataset Pipeline
+
+Generate a stable dataset row from the current NativeLens report and
+compatibility summary:
+
+```dart
+final NativeLensDatasetRow row = await nativeLens.generateDatasetRow();
+
+print(row.platform);
+print(row.overallScore);
+print(row.riskLevel);
+```
+
+Export one row to JSON:
+
+```dart
+final String json = NativeLensDatasetExporter.toJson(row);
+
+print(json);
+```
+
+Export one or more rows to CSV:
+
+```dart
+final String csv = NativeLensDatasetExporter.toCsv(<NativeLensDatasetRow>[row]);
+
+print(csv);
+```
+
 ### Live Network Capability Updates
 
 ```dart
@@ -210,7 +239,6 @@ It reads Camera2 metadata only and does not open the camera or capture media.
 - Deep Android capability support remains the primary focus.
 - iOS support is currently foundational and safe-fallback oriented.
 - No AI model yet.
-- No dashboard graphs yet.
 - No macOS, Windows, Linux, or web implementation yet.
 
 ## Author

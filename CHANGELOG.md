@@ -1,3 +1,13 @@
+## 0.4.0
+
+Release date: 2026-05-24
+
+- Added NativeLensDatasetRow model
+- Added generateDatasetRow() API
+- Added NativeLensDatasetExporter for JSON/CSV export
+- Added Dataset Export actions in example dashboard
+- Added built-in visual charts to example dashboard
+
 ## 0.3.0
 
 Release date: 2026-05-23
