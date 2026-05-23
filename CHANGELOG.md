@@ -1,9 +1,15 @@
 ## 0.3.0
 
-Unreleased
+Release date: 2026-05-23
 
-- Added initial iOS foundation support for platform summary, power state, network capability, and device orientation.
-- Returned safe fallback values on iOS for unsupported modules.
+- Added initial iOS foundation support using Swift Platform Channels
+- Added iOS platform summary support
+- Added iOS power/battery safe support
+- Added iOS network capability snapshot and stream support
+- Added iOS device orientation snapshot and stream support
+- Added safe iOS fallbacks for unsupported deep capability modules
+- Added iOS example project support
+- Added iOS CocoaPods podspec
 
 ## 0.2.1
 

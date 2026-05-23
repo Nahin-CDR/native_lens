@@ -1,8 +1,9 @@
 # NativeLens
 
-NativeLens is a Flutter Android capability intelligence SDK. It uses Kotlin
-Platform Channels to inspect native Android device capabilities, build runtime
-reports, and run offline compatibility analysis from Dart.
+NativeLens is a Flutter capability intelligence SDK with deep Android support
+and initial iOS foundation support. It uses Platform Channels to inspect native
+device capabilities, build runtime reports, and run offline compatibility
+analysis from Dart.
 
 NativeLens is designed for apps that need a clear, developer-friendly snapshot
 of the device they are running on without adding a backend, AI service, or
@@ -30,7 +31,7 @@ Add NativeLens to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  native_lens: ^0.2.0
+  native_lens: ^0.3.0
 ```
 
 Then run:
@@ -41,8 +42,10 @@ flutter pub get
 
 ## Platform Support
 
-- Android: deep native capability support for platform summary, sensors, display, media codecs, camera capabilities, power state, and network diagnostics.
-- iOS: initial foundation support for platform summary, power state, network capability, and device orientation, with safe fallbacks for unsupported modules.
+| Platform | Support level |
+| --- | --- |
+| Android | Deep native capability support for platform summary, sensors, display, media codecs, camera capabilities, power state, and network diagnostics |
+| iOS | Foundation support with platform summary, power state, network capability, device orientation, and safe fallbacks for unsupported deep capability modules |
 
 ## Basic Usage
 
@@ -204,10 +207,11 @@ It reads Camera2 metadata only and does not open the camera or capture media.
 
 ## Current Limitations
 
-- Android only.
+- Deep Android capability support remains the primary focus.
+- iOS support is currently foundational and safe-fallback oriented.
 - No AI model yet.
 - No dashboard graphs yet.
-- No iOS, macOS, Windows, Linux, or web implementation yet.
+- No macOS, Windows, Linux, or web implementation yet.
 
 ## Author
 
