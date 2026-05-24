@@ -20,8 +20,8 @@ schemaVersion,platform,batteryLevel,isCharging,isPowerSaveMode,networkConnected,
 ## Current Status
 
 This workspace prepares the repository for future AI/ML experiments and training
-pipelines. No AI model, training code, Python environment, or extra dependency is
-added yet.
+pipelines. The current scripts are intentionally small and local-first; no
+production AI model is added yet.
 
 The included CSV rows are fake demo samples only. They must not be treated as
 real device telemetry or personal data.
@@ -40,3 +40,24 @@ python3 ml/scripts/validate_dataset.py ml/dataset/sample_native_lens_dataset.csv
 
 The script reports total rows, valid rows, invalid rows, and the `riskLevel`
 distribution. It does not train a model or add any Python dependencies.
+
+## Risk Model Training
+
+Install the ML dependencies from the dedicated ML requirements file:
+
+```sh
+python3 -m pip install -r ml/requirements.txt
+```
+
+Train a simple local `riskLevel` model from a NativeLens CSV dataset:
+
+```sh
+python3 ml/scripts/train_risk_model.py ml/dataset/sample_native_lens_dataset.csv
+```
+
+The training script saves the generated model to `ml/models/risk_model.joblib`.
+Generated `.joblib` model files are ignored by git.
+
+The current sample dataset is demo-only and intentionally tiny. Real accuracy
+requires a larger, representative NativeLens dataset before the model should be
+used for meaningful decisions.
