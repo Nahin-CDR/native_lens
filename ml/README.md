@@ -58,6 +58,13 @@ python3 ml/scripts/train_risk_model.py ml/dataset/sample_native_lens_dataset.csv
 The training script saves the generated model to `ml/models/risk_model.joblib`.
 Generated `.joblib` model files are ignored by git.
 
+Train first, then run predictions against a NativeLens CSV dataset:
+
+```sh
+python3 ml/scripts/train_risk_model.py ml/dataset/sample_native_lens_dataset.csv
+python3 ml/scripts/predict_risk.py ml/dataset/sample_native_lens_dataset.csv
+```
+
 The current sample dataset is demo-only and intentionally tiny. Real accuracy
-requires a larger, representative NativeLens dataset before the model should be
-used for meaningful decisions.
+and predictions require a larger, representative NativeLens dataset before the
+model should be used for meaningful decisions.
