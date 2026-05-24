@@ -34,3 +34,5 @@ migrate_working_dir/
 
 # NativeLens ML generated artifacts
 ml/models/*.joblib
+ml/dataset/real_*.csv
+ml/dataset/local_*.csv

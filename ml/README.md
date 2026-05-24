@@ -26,6 +26,9 @@ production AI model is added yet.
 The included CSV rows are fake demo samples only. They must not be treated as
 real device telemetry or personal data.
 
+For real-device checks and local dataset collection guidance, see
+`REAL_DEVICE_TESTING.md`.
+
 ## Dataset Validation
 
 Validation is required before future ML training so malformed CSV files, missing
