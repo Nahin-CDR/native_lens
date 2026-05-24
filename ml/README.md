@@ -65,6 +65,12 @@ python3 ml/scripts/train_risk_model.py ml/dataset/sample_native_lens_dataset.csv
 python3 ml/scripts/predict_risk.py ml/dataset/sample_native_lens_dataset.csv
 ```
 
+Evaluate the trained model against labeled dataset rows:
+
+```sh
+python3 ml/scripts/evaluate_model.py ml/dataset/sample_native_lens_dataset.csv
+```
+
 The current sample dataset is demo-only and intentionally tiny. Real accuracy
 and predictions require a larger, representative NativeLens dataset before the
 model should be used for meaningful decisions.
