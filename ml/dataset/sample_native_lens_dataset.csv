@@ -1,0 +1,5 @@
+schemaVersion,platform,batteryLevel,isCharging,isPowerSaveMode,networkConnected,networkValidated,networkMetered,hasHevcEncoder,maxRefreshRate,cameraCount,sensorCount,codecCount,overallScore,riskLevel,labelSource,createdAtMillis
+1.0.0,android,86,true,false,true,true,false,true,120.0,3,18,42,92,low,demo,1767225600000
+1.0.0,ios,64,false,false,true,true,false,true,60.0,2,12,28,84,low,demo,1767225660000
+1.0.0,android,28,false,true,true,false,true,false,90.0,2,14,31,61,medium,demo,1767225720000
+1.0.0,ios,12,false,true,false,false,false,true,60.0,2,10,24,43,high,demo,1767225780000
