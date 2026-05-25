@@ -627,6 +627,22 @@ class _MyAppState extends State<MyApp> {
             value: _formatTimestamp(result.analyzedAtMillis),
           ),
           const SizedBox(height: 8),
+          _capabilitySection(
+            title: 'Required Capabilities',
+            capabilities: result.requiredCapabilities,
+          ),
+          const SizedBox(height: 8),
+          _capabilitySection(
+            title: 'Available Capabilities',
+            capabilities: result.availableCapabilities,
+          ),
+          const SizedBox(height: 8),
+          _capabilitySection(
+            title: 'Missing Capabilities',
+            capabilities: result.missingCapabilities,
+            emptyMessage: 'No missing required capabilities detected.',
+          ),
+          const SizedBox(height: 8),
           const Text('Reasons', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           ...result.reasons.map(
@@ -644,6 +660,30 @@ class _MyAppState extends State<MyApp> {
           Text(result.recommendation),
         ],
       ),
+    );
+  }
+
+  Widget _capabilitySection({
+    required String title,
+    required List<String> capabilities,
+    String emptyMessage = 'None reported.',
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        if (capabilities.isEmpty)
+          Text(emptyMessage)
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: capabilities
+                .map((String capability) => Chip(label: Text(capability)))
+                .toList(),
+          ),
+      ],
     );
   }
 
