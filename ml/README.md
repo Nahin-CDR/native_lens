@@ -29,6 +29,9 @@ real device telemetry or personal data.
 For real-device checks and local dataset collection guidance, see
 `REAL_DEVICE_TESTING.md`.
 
+For model deployment options and why generated model files are not committed yet,
+see `MODEL_DEPLOYMENT.md`.
+
 ## Dataset Validation
 
 Validation is required before future ML training so malformed CSV files, missing
