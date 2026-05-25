@@ -130,6 +130,51 @@ print(summary.recommendations);
 The compatibility summary is generated locally with simple Dart rules. It does
 not call an AI API, backend, paid service, or remote model.
 
+### Task Risk Analysis
+
+NativeLens can analyze whether the current device state is suitable for
+performance-sensitive tasks using offline native signals and explainable
+rule-based intelligence.
+
+Supported tasks:
+
+- `videoUpload`
+- `videoRecording`
+- `audioRecording`
+- `mediaProcessing`
+- `backgroundSync`
+- `cameraCapture`
+- `realtimeStreaming`
+
+```dart
+final result = await NativeLens().analyzeTaskRisk(
+  task: NativeLensTask.videoUpload,
+);
+
+print(result.riskLevel);
+print(result.confidence);
+print(result.reasons);
+print(result.recommendation);
+```
+
+Sample output:
+
+```text
+riskLevel: high
+confidence: 0.91
+reasons:
+- Battery is below 10% and the device is not charging.
+- Network is not connected.
+
+recommendation:
+Delay video upload until the device is charging or network is stable.
+```
+
+Task risk analysis works offline. It does not require a server, Ollama, or an
+ML model file. The result is derived from native device signals such as battery,
+charging state, power saver mode, network status, codec support, camera
+availability, refresh rate, sensor count, and compatibility score.
+
 ### Dataset Pipeline
 
 Generate a stable dataset row from the current NativeLens report and
