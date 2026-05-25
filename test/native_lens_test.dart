@@ -515,7 +515,8 @@ void main() {
     NativeLensPlatform.instance = fakePlatform;
 
     final int beforeGeneration = DateTime.now().millisecondsSinceEpoch;
-    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+    final NativeLensDatasetRow row = await nativeLensPlugin
+        .generateDatasetRow();
 
     expect(row.isValid, isTrue);
     expect(row.schemaVersion, '1.0.0');
@@ -537,7 +538,8 @@ void main() {
     MockHevcPlatform fakePlatform = MockHevcPlatform();
     NativeLensPlatform.instance = fakePlatform;
 
-    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+    final NativeLensDatasetRow row = await nativeLensPlugin
+        .generateDatasetRow();
 
     expect(row.hasHevcEncoder, isTrue);
   });
@@ -547,19 +549,44 @@ void main() {
     MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
     NativeLensPlatform.instance = fakePlatform;
 
-    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+    final NativeLensDatasetRow row = await nativeLensPlugin
+        .generateDatasetRow();
 
     expect(row.hasHevcEncoder, isFalse);
   });
 
-  test('generateDatasetRow normalizes risk level to high for limited results', () async {
+  test(
+    'generateDatasetRow normalizes risk level to high for limited results',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockHighRiskPlatform fakePlatform = MockHighRiskPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensDatasetRow row = await nativeLensPlugin
+          .generateDatasetRow();
+
+      expect(row.riskLevel, 'high');
+    },
+  );
+
+  test('analyzeTaskRisk returns a valid offline result', () async {
     NativeLens nativeLensPlugin = NativeLens();
-    MockHighRiskPlatform fakePlatform = MockHighRiskPlatform();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
     NativeLensPlatform.instance = fakePlatform;
 
-    final NativeLensDatasetRow row = await nativeLensPlugin.generateDatasetRow();
+    final int beforeAnalysis = DateTime.now().millisecondsSinceEpoch;
+    final NativeTaskRiskResult result = await nativeLensPlugin.analyzeTaskRisk(
+      task: NativeLensTask.videoUpload,
+    );
 
-    expect(row.riskLevel, 'high');
+    expect(result.task, NativeLensTask.videoUpload);
+    expect(result.riskLevel, isIn(<String>['low', 'medium', 'high']));
+    expect(result.confidence, greaterThanOrEqualTo(0));
+    expect(result.confidence, lessThanOrEqualTo(1));
+    expect(result.reasons, isNotEmpty);
+    expect(result.recommendation, isNotEmpty);
+    expect(result.analyzedAtMillis, greaterThanOrEqualTo(beforeAnalysis));
+    expect(result.toMap()['riskLevel'], result.riskLevel);
   });
 
   test('networkCapabilityStream', () async {
@@ -593,8 +620,8 @@ void main() {
     MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
     NativeLensPlatform.instance = fakePlatform;
 
-    final DeviceOrientationInfo orientation =
-        await nativeLensPlugin.getDeviceOrientation();
+    final DeviceOrientationInfo orientation = await nativeLensPlugin
+        .getDeviceOrientation();
 
     expect(orientation.orientationName, 'portraitUp');
     expect(orientation.rotationDegrees, 0);

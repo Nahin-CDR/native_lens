@@ -8,12 +8,14 @@ import 'native_lens_dataset_row.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_lens_report.dart';
 import 'native_sensor.dart';
+import 'native_task_risk_result.dart';
 import 'network_capability.dart';
 import 'network_speed_sample.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
 import 'system_feature.dart';
 import 'device_orientation_info.dart';
+import 'native_lens_task.dart';
 
 export 'camera_capability.dart';
 export 'compatibility_summary.dart';
@@ -21,8 +23,10 @@ export 'display_info.dart';
 export 'media_codec_capability.dart';
 export 'native_lens_dataset_exporter.dart';
 export 'native_lens_dataset_row.dart';
+export 'native_lens_task.dart';
 export 'native_sensor.dart';
 export 'native_lens_report.dart';
+export 'native_task_risk_result.dart';
 export 'network_capability.dart';
 export 'network_speed_sample.dart';
 export 'platform_summary.dart';
@@ -86,7 +90,8 @@ class NativeLens {
     final List<NativeSensor> sensors = await getSensors();
     final DisplayInfo displayInfo = await getDisplayInfo();
     final List<MediaCodecCapability> mediaCodecs = await getMediaCodecs();
-    final List<CameraCapability> cameraCapabilities = await getCameraCapabilities();
+    final List<CameraCapability> cameraCapabilities =
+        await getCameraCapabilities();
     final PowerState powerState = await getPowerState();
     final NetworkCapability networkCapability = await getNetworkCapability();
 
@@ -176,7 +181,8 @@ class NativeLens {
   /// stable dataset row.
   Future<NativeLensDatasetRow> generateDatasetRow() async {
     final NativeLensReport report = await generateReport();
-    final CompatibilitySummary compatibilitySummary = await analyzeCompatibility();
+    final CompatibilitySummary compatibilitySummary =
+        await analyzeCompatibility();
 
     return NativeLensDatasetRow(
       schemaVersion: '1.0.0',
@@ -196,6 +202,29 @@ class NativeLens {
       riskLevel: _normalizeRiskLevel(compatibilitySummary.overallLevel),
       labelSource: 'rule_based_v1',
       createdAtMillis: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Analyzes task risk locally using the current NativeLens dataset row.
+  ///
+  /// This is an offline API skeleton. It does not call a server, Ollama, or an
+  /// ML model file. The placeholder logic maps the current overall score to a
+  /// task risk level.
+  Future<NativeTaskRiskResult> analyzeTaskRisk({
+    required NativeLensTask task,
+  }) async {
+    final NativeLensDatasetRow row = await generateDatasetRow();
+    final String riskLevel = _riskLevelForOverallScore(row.overallScore);
+
+    return NativeTaskRiskResult(
+      task: task,
+      riskLevel: riskLevel,
+      confidence: 0.60,
+      reasons: <String>[
+        'Overall compatibility score is ${row.overallScore}, which maps to $riskLevel risk.',
+      ],
+      recommendation: _taskRiskRecommendation(task, riskLevel),
+      analyzedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
 
@@ -367,7 +396,8 @@ class NativeLens {
 
       return supportedTypes.any((String supportedType) {
         final String normalizedType = supportedType.toLowerCase();
-        return normalizedType.contains('hevc') || normalizedType.contains('h265');
+        return normalizedType.contains('hevc') ||
+            normalizedType.contains('h265');
       });
     });
   }
@@ -378,8 +408,9 @@ class NativeLens {
     }
 
     if (displayInfo.supportedRefreshRates.isNotEmpty) {
-      return displayInfo.supportedRefreshRates
-          .reduce((double a, double b) => a > b ? a : b);
+      return displayInfo.supportedRefreshRates.reduce(
+        (double a, double b) => a > b ? a : b,
+      );
     }
 
     return 0;
@@ -418,6 +449,51 @@ class NativeLens {
     }
 
     return 'unknown';
+  }
+
+  String _riskLevelForOverallScore(int overallScore) {
+    if (overallScore >= 80) {
+      return 'low';
+    }
+
+    if (overallScore >= 50) {
+      return 'medium';
+    }
+
+    return 'high';
+  }
+
+  String _taskRiskRecommendation(NativeLensTask task, String riskLevel) {
+    final String taskLabel = _taskLabel(task);
+
+    if (riskLevel == 'low') {
+      return '$taskLabel can proceed with normal NativeLens safeguards.';
+    }
+
+    if (riskLevel == 'medium') {
+      return 'Use lighter settings for $taskLabel and monitor device state.';
+    }
+
+    return 'Delay $taskLabel or use a safer fallback until conditions improve.';
+  }
+
+  String _taskLabel(NativeLensTask task) {
+    switch (task) {
+      case NativeLensTask.videoUpload:
+        return 'Video upload';
+      case NativeLensTask.videoRecording:
+        return 'Video recording';
+      case NativeLensTask.audioRecording:
+        return 'Audio recording';
+      case NativeLensTask.mediaProcessing:
+        return 'Media processing';
+      case NativeLensTask.backgroundSync:
+        return 'Background sync';
+      case NativeLensTask.cameraCapture:
+        return 'Camera capture';
+      case NativeLensTask.realtimeStreaming:
+        return 'Realtime streaming';
+    }
   }
 
   String _getOverallLevel(int score) {
