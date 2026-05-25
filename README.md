@@ -175,6 +175,62 @@ ML model file. The result is derived from native device signals such as battery,
 charging state, power saver mode, network status, codec support, camera
 availability, refresh rate, sensor count, and compatibility score.
 
+#### Capability Requirements
+
+NativeLens can also check whether the current device has the required
+capabilities for specific tasks. Capability checks use the same offline native
+signals and can report required, available, and missing capabilities such as:
+
+- camera
+- stable network
+- media codec support
+- HEVC availability or H.264 fallback
+- gyroscope
+- accelerometer
+- step counter or step detector
+- magnetometer or compass
+
+Supported capability-dependent tasks:
+
+- `arExperience`
+- `stepTracking`
+- `compassNavigation`
+
+```dart
+final result = await NativeLens().analyzeTaskRisk(
+  task: NativeLensTask.arExperience,
+);
+
+print(result.requiredCapabilities);
+print(result.availableCapabilities);
+print(result.missingCapabilities);
+print(result.reasons);
+print(result.recommendation);
+```
+
+Sample output:
+
+```text
+requiredCapabilities:
+- camera
+- gyroscope
+- accelerometer
+
+missingCapabilities:
+- gyroscope
+
+reasons:
+- Required gyroscope sensor is missing.
+
+recommendation:
+Disable AR mode and provide a non-AR fallback experience.
+```
+
+Capability requirements work offline. They do not require a server, Ollama, or
+an ML model file. NativeLens uses native device signals and explainable
+rule-based intelligence, and it does not claim CPU, GPU, or chip-level
+detection unless reliable platform APIs expose that data.
+
 ### Dataset Pipeline
 
 Generate a stable dataset row from the current NativeLens report and
