@@ -1,3 +1,19 @@
+## 0.5.0
+
+Release date: 2026-05-26
+
+- Added offline Task Risk Analysis API
+- Added NativeLensTask enum
+- Added NativeTaskRiskResult model
+- Added smart rule-based task risk engine
+- Added capability requirement detection
+- Added required/available/missing capabilities in task risk result
+- Added AR, step tracking, and compass navigation task support
+- Added task risk and capability UI in example dashboard
+- Added ML workspace, dataset validation, training, prediction, and evaluation scripts
+- Added real device dataset collection guide
+- Added ML model deployment strategy documentation
+
 ## 0.4.0
 
 Release date: 2026-05-24
