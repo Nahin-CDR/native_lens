@@ -10,6 +10,9 @@ void main() {
       reasons: <String>['Overall compatibility score is 90.'],
       recommendation: 'Video upload can proceed.',
       analyzedAtMillis: 1716470400000,
+      requiredCapabilities: <String>['stable network'],
+      missingCapabilities: <String>[],
+      availableCapabilities: <String>['stable network'],
     );
 
     test('toMap returns stable fields', () {
@@ -20,6 +23,9 @@ void main() {
         'reasons': <String>['Overall compatibility score is 90.'],
         'recommendation': 'Video upload can proceed.',
         'analyzedAtMillis': 1716470400000,
+        'requiredCapabilities': <String>['stable network'],
+        'missingCapabilities': <String>[],
+        'availableCapabilities': <String>['stable network'],
       });
     });
 
@@ -27,6 +33,7 @@ void main() {
       expect(result.toString(), contains('NativeTaskRiskResult'));
       expect(result.toString(), contains('videoUpload'));
       expect(result.toString(), contains('low'));
+      expect(result.toString(), contains('requiredCapabilities'));
     });
   });
 }

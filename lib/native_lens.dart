@@ -214,7 +214,14 @@ class NativeLens {
     required NativeLensTask task,
   }) async {
     final NativeLensDatasetRow row = await generateDatasetRow();
-    final _TaskRiskSignals signals = _evaluateTaskRiskSignals(task, row);
+    final List<NativeSensor> sensors = await getSensors();
+    final List<SystemFeature> systemFeatures = await getSystemFeatures();
+    final _TaskRiskSignals signals = _evaluateTaskRiskSignals(
+      task,
+      row,
+      sensors,
+      systemFeatures,
+    );
     final String riskLevel = _riskLevelForSignals(signals);
 
     return NativeTaskRiskResult(
@@ -222,8 +229,11 @@ class NativeLens {
       riskLevel: riskLevel,
       confidence: _confidenceForSignals(riskLevel, signals),
       reasons: signals.reasons,
-      recommendation: _taskRiskRecommendation(task, riskLevel, row),
+      recommendation: _taskRiskRecommendation(task, riskLevel, row, signals),
       analyzedAtMillis: DateTime.now().millisecondsSinceEpoch,
+      requiredCapabilities: signals.requiredCapabilities,
+      missingCapabilities: signals.missingCapabilities,
+      availableCapabilities: signals.availableCapabilities,
     );
   }
 
@@ -453,8 +463,17 @@ class NativeLens {
   _TaskRiskSignals _evaluateTaskRiskSignals(
     NativeLensTask task,
     NativeLensDatasetRow row,
+    List<NativeSensor> sensors,
+    List<SystemFeature> systemFeatures,
   ) {
     final _TaskRiskSignals signals = _TaskRiskSignals();
+    _evaluateCapabilityRequirements(
+      task,
+      row,
+      sensors,
+      systemFeatures,
+      signals,
+    );
 
     if (row.overallScore < 50) {
       signals.addHigh('Overall compatibility score is below 50.', weight: 4);
@@ -511,6 +530,15 @@ class NativeLens {
         }
         _evaluateRefreshRateRisk(row, signals);
         _evaluateBatteryRisk(row, signals, highBelow: 10, mediumBelow: 15);
+      case NativeLensTask.arExperience:
+        _evaluateBatteryRisk(row, signals, highBelow: 10, mediumBelow: 20);
+        _evaluatePowerSaveRisk(row, signals);
+      case NativeLensTask.stepTracking:
+        _evaluateBatteryRisk(row, signals, highBelow: 5, mediumBelow: 15);
+        _evaluatePowerSaveRisk(row, signals);
+      case NativeLensTask.compassNavigation:
+        _evaluateBatteryRisk(row, signals, highBelow: 5, mediumBelow: 15);
+        _evaluatePowerSaveRisk(row, signals);
     }
 
     if (signals.reasons.isEmpty) {
@@ -520,6 +548,234 @@ class NativeLens {
     }
 
     return signals;
+  }
+
+  void _evaluateCapabilityRequirements(
+    NativeLensTask task,
+    NativeLensDatasetRow row,
+    List<NativeSensor> sensors,
+    List<SystemFeature> systemFeatures,
+    _TaskRiskSignals signals,
+  ) {
+    switch (task) {
+      case NativeLensTask.videoUpload:
+        _requireStableNetwork(
+          row,
+          signals,
+          disconnectedReason:
+              'Network capability is missing for video upload because the network is not connected.',
+          unvalidatedReason: 'Network is not validated for video upload.',
+        );
+      case NativeLensTask.videoRecording:
+        _requireCamera(row, signals);
+        _requireMediaCodecs(row, signals);
+        _trackHevcAvailability(row, signals);
+      case NativeLensTask.audioRecording:
+        _trackMicrophoneCapability(systemFeatures, signals);
+      case NativeLensTask.mediaProcessing:
+        _requireMediaCodecs(row, signals);
+        _trackHevcAvailability(row, signals);
+      case NativeLensTask.backgroundSync:
+        _requireStableNetwork(
+          row,
+          signals,
+          disconnectedReason:
+              'Network capability is missing for background sync because the network is not connected.',
+          unvalidatedReason: 'Network is not validated for background sync.',
+        );
+      case NativeLensTask.cameraCapture:
+        _requireCamera(row, signals);
+      case NativeLensTask.realtimeStreaming:
+        _requireStableNetwork(
+          row,
+          signals,
+          disconnectedReason:
+              'Network capability is missing for realtime streaming because the network is not connected.',
+          unvalidatedReason: 'Network is not validated for realtime streaming.',
+          validationIsHighRisk: true,
+        );
+        if (row.networkMetered) {
+          signals.addMissingCapability('unmetered network');
+          signals.addMedium(
+            'Network is metered, which may affect realtime streaming.',
+            weight: 2,
+          );
+        }
+      case NativeLensTask.arExperience:
+        _requireCamera(row, signals);
+        _requireSensor(
+          sensors,
+          signals,
+          capability: 'gyroscope sensor',
+          androidTypes: const <int>[4, 16],
+          nameMatches: const <String>['gyroscope', 'gyro'],
+          missingReason: 'Required gyroscope sensor is missing.',
+        );
+        _requireSensor(
+          sensors,
+          signals,
+          capability: 'accelerometer sensor',
+          androidTypes: const <int>[1],
+          nameMatches: const <String>['accelerometer'],
+          missingReason: 'Required accelerometer sensor is missing.',
+        );
+      case NativeLensTask.stepTracking:
+        _requireSensor(
+          sensors,
+          signals,
+          capability: 'step counter or step detector sensor',
+          androidTypes: const <int>[18, 19],
+          nameMatches: const <String>['step counter', 'step detector'],
+          missingReason: 'Required step counter sensor is missing.',
+        );
+      case NativeLensTask.compassNavigation:
+        _requireSensor(
+          sensors,
+          signals,
+          capability: 'magnetometer or compass sensor',
+          androidTypes: const <int>[2],
+          nameMatches: const <String>['magnetometer', 'magnetic', 'compass'],
+          missingReason: 'Required magnetometer or compass sensor is missing.',
+        );
+    }
+  }
+
+  void _requireStableNetwork(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals, {
+    required String disconnectedReason,
+    required String unvalidatedReason,
+    bool validationIsHighRisk = false,
+  }) {
+    signals.addRequiredCapability('stable network');
+
+    if (!row.networkConnected) {
+      signals.addMissingCapability('stable network');
+      signals.addHigh(disconnectedReason, weight: 4);
+      return;
+    }
+
+    if (!row.networkValidated) {
+      signals.addMissingCapability('validated network');
+      if (validationIsHighRisk) {
+        signals.addHigh(unvalidatedReason, weight: 4);
+      } else {
+        signals.addMedium(unvalidatedReason, weight: 2);
+      }
+      return;
+    }
+
+    signals.addAvailableCapability('stable network');
+  }
+
+  void _requireCamera(NativeLensDatasetRow row, _TaskRiskSignals signals) {
+    signals.addRequiredCapability('camera capability');
+
+    if (row.cameraCount == 0) {
+      signals.addMissingCapability('camera capability');
+      signals.addHigh('Camera capability is not available.', weight: 4);
+      return;
+    }
+
+    signals.addAvailableCapability('camera capability');
+  }
+
+  void _requireMediaCodecs(NativeLensDatasetRow row, _TaskRiskSignals signals) {
+    signals.addRequiredCapability('media codec capability');
+
+    if (row.codecCount == 0) {
+      signals.addMissingCapability('media codec capability');
+      signals.addHigh('Media codec capability is not available.', weight: 4);
+      return;
+    }
+
+    signals.addAvailableCapability('media codec capability');
+
+    if (row.codecCount < 5) {
+      signals.addMissingCapability('broad media codec capability');
+      signals.addMedium(
+        'Media codec capability is limited on this device.',
+        weight: 1,
+      );
+    }
+  }
+
+  void _trackHevcAvailability(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals,
+  ) {
+    if (row.hasHevcEncoder) {
+      signals.addAvailableCapability('HEVC encoder');
+      return;
+    }
+
+    signals.addMissingCapability('HEVC encoder');
+  }
+
+  void _trackMicrophoneCapability(
+    List<SystemFeature> systemFeatures,
+    _TaskRiskSignals signals,
+  ) {
+    if (_hasSystemFeature(systemFeatures, 'android.hardware.microphone')) {
+      signals.addRequiredCapability('microphone capability');
+      signals.addAvailableCapability('microphone capability');
+      return;
+    }
+
+    signals.addClean(
+      'Microphone capability was not reported by current system feature data; battery and power conditions were still evaluated.',
+    );
+  }
+
+  void _requireSensor(
+    List<NativeSensor> sensors,
+    _TaskRiskSignals signals, {
+    required String capability,
+    required List<int> androidTypes,
+    required List<String> nameMatches,
+    required String missingReason,
+  }) {
+    signals.addRequiredCapability(capability);
+
+    if (_hasSensor(
+      sensors,
+      androidTypes: androidTypes,
+      nameMatches: nameMatches,
+    )) {
+      signals.addAvailableCapability(capability);
+      return;
+    }
+
+    signals.addMissingCapability(capability);
+    signals.addHigh(missingReason, weight: 4);
+  }
+
+  bool _hasSensor(
+    List<NativeSensor> sensors, {
+    required List<int> androidTypes,
+    required List<String> nameMatches,
+  }) {
+    return sensors.any((NativeSensor sensor) {
+      if (androidTypes.contains(sensor.type)) {
+        return true;
+      }
+
+      final String sensorText = '${sensor.name} ${sensor.typeName}'
+          .toLowerCase();
+      return nameMatches.any((String match) {
+        return sensorText.contains(match.toLowerCase());
+      });
+    });
+  }
+
+  bool _hasSystemFeature(
+    List<SystemFeature> systemFeatures,
+    String featureName,
+  ) {
+    final String normalizedFeatureName = featureName.toLowerCase();
+    return systemFeatures.any((SystemFeature feature) {
+      return feature.name.toLowerCase() == normalizedFeatureName;
+    });
   }
 
   void _evaluateUploadNetworkRisk(
@@ -653,11 +909,27 @@ class NativeLens {
     NativeLensTask task,
     String riskLevel,
     NativeLensDatasetRow row,
+    _TaskRiskSignals signals,
   ) {
     final String taskLabel = _taskLabel(task);
 
     if (riskLevel == 'low') {
       return 'Safe to continue $taskLabel under current device conditions.';
+    }
+
+    if (task == NativeLensTask.arExperience &&
+        signals.missingCapabilities.isNotEmpty) {
+      return 'Disable AR mode and provide a non-AR fallback experience.';
+    }
+
+    if (task == NativeLensTask.stepTracking &&
+        signals.missingCapabilities.isNotEmpty) {
+      return 'Disable automatic step tracking or use a manual fallback.';
+    }
+
+    if (task == NativeLensTask.compassNavigation &&
+        signals.missingCapabilities.isNotEmpty) {
+      return 'Disable compass navigation or show a map-only fallback.';
     }
 
     if ((task == NativeLensTask.videoRecording ||
@@ -681,6 +953,12 @@ class NativeLens {
         return 'Avoid camera capture until camera and power conditions improve.';
       case NativeLensTask.realtimeStreaming:
         return 'Avoid realtime streaming until network becomes connected and validated.';
+      case NativeLensTask.arExperience:
+        return 'Use a non-AR fallback until required sensors are available.';
+      case NativeLensTask.stepTracking:
+        return 'Use manual activity entry until step tracking sensors are available.';
+      case NativeLensTask.compassNavigation:
+        return 'Use map-only navigation until compass sensors are available.';
     }
   }
 
@@ -700,6 +978,12 @@ class NativeLens {
         return 'Camera capture';
       case NativeLensTask.realtimeStreaming:
         return 'Realtime streaming';
+      case NativeLensTask.arExperience:
+        return 'AR experience';
+      case NativeLensTask.stepTracking:
+        return 'Step tracking';
+      case NativeLensTask.compassNavigation:
+        return 'Compass navigation';
     }
   }
 
@@ -722,25 +1006,46 @@ class NativeLens {
 
 class _TaskRiskSignals {
   final List<String> reasons = <String>[];
+  final List<String> requiredCapabilities = <String>[];
+  final List<String> missingCapabilities = <String>[];
+  final List<String> availableCapabilities = <String>[];
   int score = 0;
   int highSignalCount = 0;
   int mediumSignalCount = 0;
   int cleanSignalCount = 0;
 
   void addHigh(String reason, {required int weight}) {
-    reasons.add(reason);
+    _addUnique(reasons, reason);
     score += weight;
     highSignalCount += 1;
   }
 
   void addMedium(String reason, {required int weight}) {
-    reasons.add(reason);
+    _addUnique(reasons, reason);
     score += weight;
     mediumSignalCount += 1;
   }
 
   void addClean(String reason) {
-    reasons.add(reason);
+    _addUnique(reasons, reason);
     cleanSignalCount += 1;
+  }
+
+  void addRequiredCapability(String capability) {
+    _addUnique(requiredCapabilities, capability);
+  }
+
+  void addMissingCapability(String capability) {
+    _addUnique(missingCapabilities, capability);
+  }
+
+  void addAvailableCapability(String capability) {
+    _addUnique(availableCapabilities, capability);
+  }
+
+  void _addUnique(List<String> values, String value) {
+    if (!values.contains(value)) {
+      values.add(value);
+    }
   }
 }

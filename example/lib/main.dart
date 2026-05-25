@@ -663,6 +663,12 @@ class _MyAppState extends State<MyApp> {
         return 'Camera Capture';
       case NativeLensTask.realtimeStreaming:
         return 'Realtime Streaming';
+      case NativeLensTask.arExperience:
+        return 'AR Experience';
+      case NativeLensTask.stepTracking:
+        return 'Step Tracking';
+      case NativeLensTask.compassNavigation:
+        return 'Compass Navigation';
     }
   }
 

@@ -10,6 +10,9 @@ class NativeTaskRiskResult {
     required this.reasons,
     required this.recommendation,
     required this.analyzedAtMillis,
+    this.requiredCapabilities = const <String>[],
+    this.missingCapabilities = const <String>[],
+    this.availableCapabilities = const <String>[],
   });
 
   /// Task that was analyzed.
@@ -30,6 +33,15 @@ class NativeTaskRiskResult {
   /// Analysis timestamp in milliseconds since epoch.
   final int analyzedAtMillis;
 
+  /// Capabilities required by the selected task.
+  final List<String> requiredCapabilities;
+
+  /// Required or preferred capabilities that are unavailable or unstable.
+  final List<String> missingCapabilities;
+
+  /// Required or preferred capabilities currently available on the device.
+  final List<String> availableCapabilities;
+
   /// Serializes the result to a map using stable field names.
   Map<String, Object> toMap() {
     return <String, Object>{
@@ -39,6 +51,9 @@ class NativeTaskRiskResult {
       'reasons': reasons,
       'recommendation': recommendation,
       'analyzedAtMillis': analyzedAtMillis,
+      'requiredCapabilities': requiredCapabilities,
+      'missingCapabilities': missingCapabilities,
+      'availableCapabilities': availableCapabilities,
     };
   }
 
@@ -50,7 +65,10 @@ class NativeTaskRiskResult {
         'confidence: $confidence, '
         'reasons: $reasons, '
         'recommendation: $recommendation, '
-        'analyzedAtMillis: $analyzedAtMillis'
+        'analyzedAtMillis: $analyzedAtMillis, '
+        'requiredCapabilities: $requiredCapabilities, '
+        'missingCapabilities: $missingCapabilities, '
+        'availableCapabilities: $availableCapabilities'
         ')';
   }
 }

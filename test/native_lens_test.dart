@@ -375,6 +375,20 @@ class MockLowBatteryPlatform extends MockNativeLensPlatform {
   }
 }
 
+class MockNoCameraPlatform extends MockNativeLensPlatform {
+  @override
+  Future<List<CameraCapability>> getCameraCapabilities() {
+    return Future<List<CameraCapability>>.value(<CameraCapability>[]);
+  }
+}
+
+class MockMissingMotionSensorsPlatform extends MockNativeLensPlatform {
+  @override
+  Future<List<NativeSensor>> getSensors() {
+    return Future<List<NativeSensor>>.value(<NativeSensor>[]);
+  }
+}
+
 void main() {
   final NativeLensPlatform initialPlatform = NativeLensPlatform.instance;
 
@@ -628,6 +642,21 @@ void main() {
     expect(result.toMap()['riskLevel'], result.riskLevel);
   });
 
+  test('analyzeTaskRisk includes capability fields', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeTaskRiskResult result = await nativeLensPlugin.analyzeTaskRisk(
+      task: NativeLensTask.videoUpload,
+    );
+
+    expect(result.requiredCapabilities, contains('stable network'));
+    expect(result.availableCapabilities, contains('stable network'));
+    expect(result.missingCapabilities, isEmpty);
+    expect(result.toMap()['requiredCapabilities'], result.requiredCapabilities);
+  });
+
   test(
     'analyzeTaskRisk returns high risk when upload network is disconnected',
     () async {
@@ -681,6 +710,46 @@ void main() {
     );
     expect(result.confidence, greaterThanOrEqualTo(0));
     expect(result.confidence, lessThanOrEqualTo(1));
+  });
+
+  test(
+    'analyzeTaskRisk returns high risk when camera capture has no camera',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockNoCameraPlatform fakePlatform = MockNoCameraPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeTaskRiskResult result = await nativeLensPlugin
+          .analyzeTaskRisk(task: NativeLensTask.cameraCapture);
+
+      expect(result.riskLevel, 'high');
+      expect(result.requiredCapabilities, contains('camera capability'));
+      expect(result.missingCapabilities, contains('camera capability'));
+      expect(result.reasons, contains('Camera capability is not available.'));
+      expect(result.confidence, greaterThanOrEqualTo(0));
+      expect(result.confidence, lessThanOrEqualTo(1));
+      expect(result.recommendation, isNotEmpty);
+    },
+  );
+
+  test('analyzeTaskRisk reports missing capability for AR task', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockMissingMotionSensorsPlatform fakePlatform =
+        MockMissingMotionSensorsPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeTaskRiskResult result = await nativeLensPlugin.analyzeTaskRisk(
+      task: NativeLensTask.arExperience,
+    );
+
+    expect(result.riskLevel, 'high');
+    expect(result.requiredCapabilities, contains('gyroscope sensor'));
+    expect(result.requiredCapabilities, contains('accelerometer sensor'));
+    expect(result.missingCapabilities, contains('gyroscope sensor'));
+    expect(result.reasons, contains('Required gyroscope sensor is missing.'));
+    expect(result.confidence, greaterThanOrEqualTo(0));
+    expect(result.confidence, lessThanOrEqualTo(1));
+    expect(result.recommendation, contains('non-AR fallback'));
   });
 
   test('analyzeTaskRisk recommendations change by task', () async {

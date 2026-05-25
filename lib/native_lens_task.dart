@@ -7,4 +7,7 @@ enum NativeLensTask {
   backgroundSync,
   cameraCapture,
   realtimeStreaming,
+  arExperience,
+  stepTracking,
+  compassNavigation,
 }
