@@ -28,12 +28,16 @@ class _MyAppState extends State<MyApp> {
   NetworkSpeedSample? _networkSpeedSample;
   CompatibilitySummary? _compatibilitySummary;
   DeviceOrientationInfo? _deviceOrientation;
+  NativeLensTask _selectedTask = NativeLensTask.videoUpload;
+  NativeTaskRiskResult? _taskRiskResult;
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   StreamSubscription<DeviceOrientationInfo>? _deviceOrientationSubscription;
   bool _isGeneratingReport = false;
   bool _isAnalyzingCompatibility = false;
+  bool _isAnalyzingTaskRisk = false;
   String? _errorMessage;
+  String? _taskRiskErrorMessage;
 
   @override
   void initState() {
@@ -121,19 +125,19 @@ class _MyAppState extends State<MyApp> {
   }
 
   void listenToDeviceOrientation() {
-    _deviceOrientationSubscription =
-        _nativeLensPlugin.deviceOrientationStream.listen(
-      (DeviceOrientationInfo orientation) {
-        if (!mounted) return;
+    _deviceOrientationSubscription = _nativeLensPlugin.deviceOrientationStream
+        .listen(
+          (DeviceOrientationInfo orientation) {
+            if (!mounted) return;
 
-        setState(() {
-          _deviceOrientation = orientation;
-        });
-      },
-      onError: (Object error) {
-        // Orientation updates are optional and may not be supported on all devices.
-      },
-    );
+            setState(() {
+              _deviceOrientation = orientation;
+            });
+          },
+          onError: (Object error) {
+            // Orientation updates are optional and may not be supported on all devices.
+          },
+        );
   }
 
   void listenToNetworkSpeed() {
@@ -158,7 +162,6 @@ class _MyAppState extends State<MyApp> {
       _errorMessage = null;
     });
 
-    
     String? errorMessage;
 
     try {
@@ -200,6 +203,34 @@ class _MyAppState extends State<MyApp> {
       _compatibilitySummary = summary;
       _isAnalyzingCompatibility = false;
       _errorMessage = errorMessage;
+    });
+  }
+
+  Future<void> analyzeTaskRisk() async {
+    setState(() {
+      _isAnalyzingTaskRisk = true;
+      _taskRiskErrorMessage = null;
+    });
+
+    NativeTaskRiskResult? result;
+    String? errorMessage;
+
+    try {
+      result = await _nativeLensPlugin.analyzeTaskRisk(task: _selectedTask);
+    } on PlatformException {
+      errorMessage = 'Failed to analyze task risk.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    } catch (error) {
+      errorMessage = 'Failed to analyze task risk: $error';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _taskRiskResult = result;
+      _isAnalyzingTaskRisk = false;
+      _taskRiskErrorMessage = errorMessage;
     });
   }
 
@@ -257,7 +288,6 @@ class _MyAppState extends State<MyApp> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    
     final bool isNetworkConnected = networkCapability.isConnected;
     final NetworkSpeedSample? visibleNetworkSpeedSample = isNetworkConnected
         ? networkSpeedSample
@@ -278,26 +308,32 @@ class _MyAppState extends State<MyApp> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('NativeLens Dashboard',
-                            style: Theme.of(context).textTheme.headlineSmall),
+                        Text(
+                          'NativeLens Dashboard',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
                         const SizedBox(height: 6),
-                        Text('${summary.manufacturer} ${summary.model}',
-                            style: Theme.of(context).textTheme.bodyMedium),
+                        Text(
+                          '${summary.manufacturer} ${summary.model}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ],
                     ),
                   ),
                   ElevatedButton(
                     onPressed: _isGeneratingReport ? null : generateFullReport,
-                    child: Text(_isGeneratingReport
-                        ? 'Generating...'
-                        : 'Generate Report'),
+                    child: Text(
+                      _isGeneratingReport ? 'Generating...' : 'Generate Report',
+                    ),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.tonal(
-                    onPressed: _isAnalyzingCompatibility ? null : analyzeCompatibility,
-                    child: Text(_isAnalyzingCompatibility
-                        ? 'Analyzing...'
-                        : 'Analyze'),
+                    onPressed: _isAnalyzingCompatibility
+                        ? null
+                        : analyzeCompatibility,
+                    child: Text(
+                      _isAnalyzingCompatibility ? 'Analyzing...' : 'Analyze',
+                    ),
                   ),
                 ],
               ),
@@ -343,6 +379,10 @@ class _MyAppState extends State<MyApp> {
 
           const SizedBox(height: 16),
 
+          _taskRiskAnalysisSection(),
+
+          const SizedBox(height: 16),
+
           _sectionCard(
             title: 'Orientation',
             child: Column(
@@ -354,7 +394,9 @@ class _MyAppState extends State<MyApp> {
                 ),
                 _SummaryRow(
                   label: 'Degrees',
-                  value: deviceOrientation?.rotationDegrees.toString() ?? 'Unknown',
+                  value:
+                      deviceOrientation?.rotationDegrees.toString() ??
+                      'Unknown',
                 ),
                 _SummaryRow(
                   label: 'Source',
@@ -375,11 +417,15 @@ class _MyAppState extends State<MyApp> {
                 ),
                 _SummaryRow(
                   label: 'Download',
-                  value: _formatSpeed(visibleNetworkSpeedSample?.rxBytesPerSecond),
+                  value: _formatSpeed(
+                    visibleNetworkSpeedSample?.rxBytesPerSecond,
+                  ),
                 ),
                 _SummaryRow(
                   label: 'Upload',
-                  value: _formatSpeed(visibleNetworkSpeedSample?.txBytesPerSecond),
+                  value: _formatSpeed(
+                    visibleNetworkSpeedSample?.txBytesPerSecond,
+                  ),
                 ),
               ],
             ),
@@ -393,7 +439,10 @@ class _MyAppState extends State<MyApp> {
               children: <Widget>[
                 _SummaryRow(label: 'Manufacturer', value: summary.manufacturer),
                 _SummaryRow(label: 'Model', value: summary.model),
-                _SummaryRow(label: 'Android Release', value: summary.androidRelease),
+                _SummaryRow(
+                  label: 'Android Release',
+                  value: summary.androidRelease,
+                ),
               ],
             ),
           ),
@@ -412,9 +461,16 @@ class _MyAppState extends State<MyApp> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text('Battery', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            Text(
+                              'Battery',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             const SizedBox(height: 6),
-                            LinearProgressIndicator(value: powerState.batteryLevel / 100.0),
+                            LinearProgressIndicator(
+                              value: powerState.batteryLevel / 100.0,
+                            ),
                           ],
                         ),
                       ),
@@ -432,8 +488,6 @@ class _MyAppState extends State<MyApp> {
       ),
     );
   }
-
-  
 
   NetworkSpeedSample _zeroNetworkSpeedSample() {
     return NetworkSpeedSample(
@@ -489,9 +543,139 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
+  Widget _taskRiskAnalysisSection() {
+    final NativeTaskRiskResult? result = _taskRiskResult;
+
+    return _sectionCard(
+      title: 'Task Risk Analysis',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          DropdownButtonFormField<NativeLensTask>(
+            initialValue: _selectedTask,
+            decoration: const InputDecoration(
+              labelText: 'Task',
+              border: OutlineInputBorder(),
+            ),
+            items: NativeLensTask.values
+                .map(
+                  (NativeLensTask task) => DropdownMenuItem<NativeLensTask>(
+                    value: task,
+                    child: Text(_taskLabel(task)),
+                  ),
+                )
+                .toList(),
+            onChanged: _isAnalyzingTaskRisk
+                ? null
+                : (NativeLensTask? task) {
+                    if (task == null) return;
+
+                    setState(() {
+                      _selectedTask = task;
+                    });
+                  },
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _isAnalyzingTaskRisk ? null : analyzeTaskRisk,
+            icon: _isAnalyzingTaskRisk
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.psychology_alt_rounded),
+            label: Text(
+              _isAnalyzingTaskRisk ? 'Analyzing Task...' : 'Analyze Task Risk',
+            ),
+          ),
+          if (_taskRiskErrorMessage != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _taskRiskErrorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (result != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _taskRiskResultPanel(result),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _taskRiskResultPanel(NativeTaskRiskResult result) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _SummaryRow(label: 'Task', value: _taskLabel(result.task)),
+          _SummaryRow(label: 'Risk', value: result.riskLevel),
+          _SummaryRow(
+            label: 'Confidence',
+            value: result.confidence.toStringAsFixed(2),
+          ),
+          _SummaryRow(
+            label: 'Analyzed',
+            value: _formatTimestamp(result.analyzedAtMillis),
+          ),
+          const SizedBox(height: 8),
+          const Text('Reasons', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          ...result.reasons.map(
+            (String reason) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text('- $reason'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Recommendation',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(result.recommendation),
+        ],
+      ),
+    );
+  }
+
+  String _taskLabel(NativeLensTask task) {
+    switch (task) {
+      case NativeLensTask.videoUpload:
+        return 'Video Upload';
+      case NativeLensTask.videoRecording:
+        return 'Video Recording';
+      case NativeLensTask.audioRecording:
+        return 'Audio Recording';
+      case NativeLensTask.mediaProcessing:
+        return 'Media Processing';
+      case NativeLensTask.backgroundSync:
+        return 'Background Sync';
+      case NativeLensTask.cameraCapture:
+        return 'Camera Capture';
+      case NativeLensTask.realtimeStreaming:
+        return 'Realtime Streaming';
+    }
+  }
+
+  String _formatTimestamp(int millis) {
+    return DateTime.fromMillisecondsSinceEpoch(
+      millis,
+    ).toLocal().toIso8601String();
+  }
+
   Future<void> _copyDatasetExport({required String format}) async {
     try {
-      final NativeLensDatasetRow row = await _nativeLensPlugin.generateDatasetRow();
+      final NativeLensDatasetRow row = await _nativeLensPlugin
+          .generateDatasetRow();
       final String payload = format == 'csv'
           ? NativeLensDatasetExporter.toCsv(<NativeLensDatasetRow>[row])
           : NativeLensDatasetExporter.toJson(row);
@@ -509,9 +693,7 @@ class _MyAppState extends State<MyApp> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to copy dataset $format: $error'),
-        ),
+        SnackBar(content: Text('Failed to copy dataset $format: $error')),
       );
     }
   }
@@ -547,7 +729,10 @@ Widget _gaugeCard({
             Center(
               child: Text(
                 value,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 6),
@@ -587,8 +772,10 @@ Widget _capabilityChartCard({
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Text('Capability Counts',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text(
+              'Capability Counts',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 12),
             _capabilityBarRow('Sensors', sensors.length, maxCount),
             _capabilityBarRow('Cameras', cameras.length, maxCount),
@@ -642,8 +829,10 @@ Widget _networkSpeedChartCard({
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                const Text('Live Network Speed',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const Text(
+                  'Live Network Speed',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
                 Text(
                   isConnected ? 'Live' : 'Offline',
                   style: TextStyle(
