@@ -208,22 +208,21 @@ class NativeLens {
   /// Analyzes task risk locally using the current NativeLens dataset row.
   ///
   /// This is an offline API skeleton. It does not call a server, Ollama, or an
-  /// ML model file. The placeholder logic maps the current overall score to a
-  /// task risk level.
+  /// ML model file. The current rule engine evaluates task-specific device,
+  /// power, network, camera, media, and score signals.
   Future<NativeTaskRiskResult> analyzeTaskRisk({
     required NativeLensTask task,
   }) async {
     final NativeLensDatasetRow row = await generateDatasetRow();
-    final String riskLevel = _riskLevelForOverallScore(row.overallScore);
+    final _TaskRiskSignals signals = _evaluateTaskRiskSignals(task, row);
+    final String riskLevel = _riskLevelForSignals(signals);
 
     return NativeTaskRiskResult(
       task: task,
       riskLevel: riskLevel,
-      confidence: 0.60,
-      reasons: <String>[
-        'Overall compatibility score is ${row.overallScore}, which maps to $riskLevel risk.',
-      ],
-      recommendation: _taskRiskRecommendation(task, riskLevel),
+      confidence: _confidenceForSignals(riskLevel, signals),
+      reasons: signals.reasons,
+      recommendation: _taskRiskRecommendation(task, riskLevel, row),
       analyzedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -451,30 +450,238 @@ class NativeLens {
     return 'unknown';
   }
 
-  String _riskLevelForOverallScore(int overallScore) {
-    if (overallScore >= 80) {
-      return 'low';
+  _TaskRiskSignals _evaluateTaskRiskSignals(
+    NativeLensTask task,
+    NativeLensDatasetRow row,
+  ) {
+    final _TaskRiskSignals signals = _TaskRiskSignals();
+
+    if (row.overallScore < 50) {
+      signals.addHigh('Overall compatibility score is below 50.', weight: 4);
+    } else if (row.overallScore < 80) {
+      signals.addMedium('Overall compatibility score is below 80.', weight: 2);
     }
 
-    if (overallScore >= 50) {
+    switch (task) {
+      case NativeLensTask.videoUpload:
+        _evaluateUploadNetworkRisk(row, signals);
+        _evaluateBatteryRisk(row, signals, highBelow: 10, mediumBelow: 20);
+      case NativeLensTask.videoRecording:
+        _evaluateBatteryRisk(row, signals, highBelow: 10, mediumBelow: 20);
+        _evaluatePowerSaveRisk(row, signals);
+        if (row.cameraCount == 0) {
+          signals.addHigh('No camera capability was reported.', weight: 4);
+        }
+        _evaluateSensorCapabilityRisk(row, signals);
+        _evaluateRefreshRateRisk(row, signals);
+        _evaluateVideoMediaRisk(row, signals);
+      case NativeLensTask.audioRecording:
+        _evaluateBatteryRisk(row, signals, highBelow: 5, mediumBelow: 10);
+        _evaluatePowerSaveRisk(row, signals);
+      case NativeLensTask.mediaProcessing:
+        _evaluateBatteryRisk(row, signals, highBelow: 15, mediumBelow: 25);
+        _evaluatePowerSaveRisk(row, signals);
+        _evaluateVideoMediaRisk(row, signals);
+      case NativeLensTask.backgroundSync:
+        _evaluateUploadNetworkRisk(row, signals);
+        _evaluateBatteryRisk(row, signals, highBelow: 10, mediumBelow: 20);
+        _evaluatePowerSaveRisk(row, signals);
+      case NativeLensTask.cameraCapture:
+        if (row.cameraCount == 0) {
+          signals.addHigh('No camera capability was reported.', weight: 4);
+        }
+        _evaluateSensorCapabilityRisk(row, signals);
+        _evaluateBatteryRisk(row, signals, highBelow: 5, mediumBelow: 10);
+        _evaluatePowerSaveRisk(row, signals);
+      case NativeLensTask.realtimeStreaming:
+        if (!row.networkConnected) {
+          signals.addHigh('Network is not connected.', weight: 4);
+        }
+        if (!row.networkValidated) {
+          signals.addHigh(
+            'Network is not validated for internet access.',
+            weight: 4,
+          );
+        }
+        if (row.networkMetered) {
+          signals.addMedium(
+            'Network is metered, which may affect upload or streaming tasks.',
+            weight: 2,
+          );
+        }
+        _evaluateRefreshRateRisk(row, signals);
+        _evaluateBatteryRisk(row, signals, highBelow: 10, mediumBelow: 15);
+    }
+
+    if (signals.reasons.isEmpty) {
+      signals.addClean(
+        'Overall compatibility score is ${row.overallScore}, and no meaningful task-specific risk signals were detected.',
+      );
+    }
+
+    return signals;
+  }
+
+  void _evaluateUploadNetworkRisk(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals,
+  ) {
+    if (!row.networkConnected) {
+      signals.addHigh('Network is not connected.', weight: 4);
+    }
+    if (!row.networkValidated) {
+      signals.addMedium(
+        'Network is not validated for internet access.',
+        weight: 2,
+      );
+    }
+    if (row.networkMetered) {
+      signals.addMedium(
+        'Network is metered, which may affect upload or streaming tasks.',
+        weight: 2,
+      );
+    }
+  }
+
+  void _evaluateBatteryRisk(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals, {
+    required int highBelow,
+    required int mediumBelow,
+  }) {
+    if (row.isCharging) {
+      return;
+    }
+
+    if (row.batteryLevel < highBelow) {
+      signals.addHigh(
+        'Battery is below $highBelow% and the device is not charging.',
+        weight: 4,
+      );
+      return;
+    }
+
+    if (row.batteryLevel < mediumBelow) {
+      signals.addMedium(
+        'Battery is below $mediumBelow% and the device is not charging.',
+        weight: 2,
+      );
+    }
+  }
+
+  void _evaluatePowerSaveRisk(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals,
+  ) {
+    if (row.isPowerSaveMode) {
+      signals.addMedium('Power saver mode is enabled.', weight: 2);
+    }
+  }
+
+  void _evaluateVideoMediaRisk(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals,
+  ) {
+    if (!row.hasHevcEncoder) {
+      signals.addMedium(
+        'HEVC encoder is not available; use H.264 fallback.',
+        weight: 1,
+      );
+    }
+    if (row.codecCount < 5) {
+      signals.addMedium(
+        'Codec count is low, which may limit media capability.',
+        weight: 1,
+      );
+    }
+  }
+
+  void _evaluateSensorCapabilityRisk(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals,
+  ) {
+    if (row.sensorCount == 0) {
+      signals.addMedium(
+        'No sensors were reported, which may limit capture stability signals.',
+        weight: 1,
+      );
+    }
+  }
+
+  void _evaluateRefreshRateRisk(
+    NativeLensDatasetRow row,
+    _TaskRiskSignals signals,
+  ) {
+    if (row.maxRefreshRate > 0 && row.maxRefreshRate < 30) {
+      signals.addMedium(
+        'Maximum refresh rate is below 30Hz, which may affect realtime tasks.',
+        weight: 1,
+      );
+    }
+  }
+
+  String _riskLevelForSignals(_TaskRiskSignals signals) {
+    if (signals.highSignalCount > 0 || signals.score >= 4) {
+      return 'high';
+    }
+
+    if (signals.mediumSignalCount > 0 || signals.score >= 2) {
       return 'medium';
     }
 
-    return 'high';
+    return 'low';
   }
 
-  String _taskRiskRecommendation(NativeLensTask task, String riskLevel) {
+  double _confidenceForSignals(String riskLevel, _TaskRiskSignals signals) {
+    double confidence;
+
+    if (riskLevel == 'high') {
+      confidence =
+          0.72 +
+          (signals.highSignalCount * 0.10) +
+          (signals.mediumSignalCount * 0.04);
+    } else if (riskLevel == 'medium') {
+      confidence = 0.64 + (signals.mediumSignalCount * 0.06);
+    } else {
+      confidence = signals.cleanSignalCount > 0 ? 0.86 : 0.80;
+    }
+
+    return confidence.clamp(0.0, 0.95);
+  }
+
+  String _taskRiskRecommendation(
+    NativeLensTask task,
+    String riskLevel,
+    NativeLensDatasetRow row,
+  ) {
     final String taskLabel = _taskLabel(task);
 
     if (riskLevel == 'low') {
-      return '$taskLabel can proceed with normal NativeLens safeguards.';
+      return 'Safe to continue $taskLabel under current device conditions.';
     }
 
-    if (riskLevel == 'medium') {
-      return 'Use lighter settings for $taskLabel and monitor device state.';
+    if ((task == NativeLensTask.videoRecording ||
+            task == NativeLensTask.mediaProcessing) &&
+        !row.hasHevcEncoder) {
+      return 'Use H.264 fallback for $taskLabel on this device.';
     }
 
-    return 'Delay $taskLabel or use a safer fallback until conditions improve.';
+    switch (task) {
+      case NativeLensTask.videoUpload:
+        return 'Delay video upload until charging or stable network is available.';
+      case NativeLensTask.videoRecording:
+        return 'Use lighter video recording settings and monitor battery state.';
+      case NativeLensTask.audioRecording:
+        return 'Keep audio recording short and monitor battery state.';
+      case NativeLensTask.mediaProcessing:
+        return 'Use lighter media processing settings until device conditions improve.';
+      case NativeLensTask.backgroundSync:
+        return 'Delay background sync until network and power conditions improve.';
+      case NativeLensTask.cameraCapture:
+        return 'Avoid camera capture until camera and power conditions improve.';
+      case NativeLensTask.realtimeStreaming:
+        return 'Avoid realtime streaming until network becomes connected and validated.';
+    }
   }
 
   String _taskLabel(NativeLensTask task) {
@@ -510,5 +717,30 @@ class NativeLens {
     }
 
     return 'Limited';
+  }
+}
+
+class _TaskRiskSignals {
+  final List<String> reasons = <String>[];
+  int score = 0;
+  int highSignalCount = 0;
+  int mediumSignalCount = 0;
+  int cleanSignalCount = 0;
+
+  void addHigh(String reason, {required int weight}) {
+    reasons.add(reason);
+    score += weight;
+    highSignalCount += 1;
+  }
+
+  void addMedium(String reason, {required int weight}) {
+    reasons.add(reason);
+    score += weight;
+    mediumSignalCount += 1;
+  }
+
+  void addClean(String reason) {
+    reasons.add(reason);
+    cleanSignalCount += 1;
   }
 }

@@ -336,6 +336,45 @@ class MockHighRiskPlatform extends MockNativeLensPlatform {
   }
 }
 
+class MockDisconnectedNetworkPlatform extends MockNativeLensPlatform {
+  @override
+  Future<NetworkCapability> getNetworkCapability() {
+    return Future<NetworkCapability>.value(
+      const NetworkCapability(
+        isConnected: false,
+        transportType: 'Disconnected',
+        isValidated: false,
+        isMetered: false,
+        hasVpn: false,
+        hasWifi: false,
+        hasCellular: false,
+        hasEthernet: false,
+        hasBluetooth: false,
+        hasLowLatency: false,
+        hasHighBandwidth: false,
+      ),
+    );
+  }
+}
+
+class MockLowBatteryPlatform extends MockNativeLensPlatform {
+  @override
+  Future<PowerState> getPowerState() {
+    return Future<PowerState>.value(
+      const PowerState(
+        batteryLevel: 8,
+        isCharging: false,
+        chargingSource: 'Not charging',
+        batteryHealth: 'Good',
+        batteryStatus: 'Discharging',
+        batteryTemperatureCelsius: 29.0,
+        isPowerSaveMode: false,
+        isIgnoringBatteryOptimizations: false,
+      ),
+    );
+  }
+}
+
 void main() {
   final NativeLensPlatform initialPlatform = NativeLensPlatform.instance;
 
@@ -588,6 +627,95 @@ void main() {
     expect(result.analyzedAtMillis, greaterThanOrEqualTo(beforeAnalysis));
     expect(result.toMap()['riskLevel'], result.riskLevel);
   });
+
+  test(
+    'analyzeTaskRisk returns high risk when upload network is disconnected',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockDisconnectedNetworkPlatform fakePlatform =
+          MockDisconnectedNetworkPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeTaskRiskResult result = await nativeLensPlugin
+          .analyzeTaskRisk(task: NativeLensTask.videoUpload);
+
+      expect(result.riskLevel, 'high');
+      expect(result.reasons, contains('Network is not connected.'));
+      expect(result.confidence, greaterThanOrEqualTo(0));
+      expect(result.confidence, lessThanOrEqualTo(1));
+      expect(result.recommendation, contains('video upload'));
+    },
+  );
+
+  test(
+    'analyzeTaskRisk returns high risk when streaming network is disconnected',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockDisconnectedNetworkPlatform fakePlatform =
+          MockDisconnectedNetworkPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeTaskRiskResult result = await nativeLensPlugin
+          .analyzeTaskRisk(task: NativeLensTask.realtimeStreaming);
+
+      expect(result.riskLevel, 'high');
+      expect(result.reasons, contains('Network is not connected.'));
+      expect(result.reasons, isNotEmpty);
+      expect(result.recommendation, contains('realtime streaming'));
+    },
+  );
+
+  test('analyzeTaskRisk detects low battery for video recording', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockLowBatteryPlatform fakePlatform = MockLowBatteryPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeTaskRiskResult result = await nativeLensPlugin.analyzeTaskRisk(
+      task: NativeLensTask.videoRecording,
+    );
+
+    expect(result.riskLevel, isIn(<String>['medium', 'high']));
+    expect(
+      result.reasons,
+      contains('Battery is below 10% and the device is not charging.'),
+    );
+    expect(result.confidence, greaterThanOrEqualTo(0));
+    expect(result.confidence, lessThanOrEqualTo(1));
+  });
+
+  test('analyzeTaskRisk recommendations change by task', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockDisconnectedNetworkPlatform fakePlatform =
+        MockDisconnectedNetworkPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeTaskRiskResult uploadResult = await nativeLensPlugin
+        .analyzeTaskRisk(task: NativeLensTask.videoUpload);
+    final NativeTaskRiskResult streamingResult = await nativeLensPlugin
+        .analyzeTaskRisk(task: NativeLensTask.realtimeStreaming);
+
+    expect(uploadResult.recommendation, isNot(streamingResult.recommendation));
+    expect(uploadResult.recommendation, contains('video upload'));
+    expect(streamingResult.recommendation, contains('realtime streaming'));
+  });
+
+  test(
+    'analyzeTaskRisk returns safe recommendation for healthy signals',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeTaskRiskResult result = await nativeLensPlugin
+          .analyzeTaskRisk(task: NativeLensTask.videoUpload);
+
+      expect(result.riskLevel, 'low');
+      expect(result.reasons, isNotEmpty);
+      expect(result.confidence, greaterThanOrEqualTo(0.80));
+      expect(result.confidence, lessThanOrEqualTo(1));
+      expect(result.recommendation, contains('Safe to continue'));
+    },
+  );
 
   test('networkCapabilityStream', () async {
     NativeLens nativeLensPlugin = NativeLens();
