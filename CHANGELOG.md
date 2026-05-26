@@ -1,10 +1,19 @@
 ## Unreleased
 
-- Added initial `dart run native_lens:splash` CLI preview for native splash setup.
-- Added native splash config parsing, validation, and dry-run planning.
-- Added Android native splash generation with automatic backups and rollback.
-- Added iOS LaunchScreen generation with asset catalog output, automatic backups,
-  and rollback.
+## 0.7.0
+
+Release date: 2026-05-26
+
+- Added Native Splash Setup Tool.
+- Added command: `dart run native_lens:splash`.
+- Added `pubspec.yaml` based splash config.
+- Added `--dry-run` preview mode.
+- Added Android native splash generation.
+- Added Android 12+ splash support.
+- Added iOS LaunchScreen generation.
+- Added backup manifest and rollback support.
+- Added validation for image path and background color.
+- Added `args` and `yaml` dependencies for CLI parsing and pubspec parsing.
 
 ## 0.6.0
 

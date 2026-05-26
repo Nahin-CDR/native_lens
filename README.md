@@ -31,7 +31,7 @@ Add NativeLens to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  native_lens: ^0.6.0
+  native_lens: ^0.7.0
 ```
 
 Then run:
