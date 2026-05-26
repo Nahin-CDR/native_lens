@@ -15,7 +15,9 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  static const Duration _powerStateRefreshInterval = Duration(seconds: 30);
+
   final _nativeLensPlugin = NativeLens();
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
@@ -33,6 +35,7 @@ class _MyAppState extends State<MyApp> {
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   StreamSubscription<DeviceOrientationInfo>? _deviceOrientationSubscription;
+  Timer? _powerStateRefreshTimer;
   bool _isGeneratingReport = false;
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
@@ -42,7 +45,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     initPlatformState();
+    startPowerStateRefreshTimer();
     listenToNetworkCapability();
     listenToNetworkSpeed();
     listenToDeviceOrientation();
@@ -50,10 +55,19 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _powerStateRefreshTimer?.cancel();
     _networkCapabilitySubscription?.cancel();
     _networkSpeedSubscription?.cancel();
     _deviceOrientationSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      refreshPowerState();
+    }
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
@@ -100,6 +114,32 @@ class _MyAppState extends State<MyApp> {
       _powerState = powerState;
       _networkCapability = networkCapability;
       _errorMessage = errorMessage;
+    });
+  }
+
+  void startPowerStateRefreshTimer() {
+    _powerStateRefreshTimer?.cancel();
+    _powerStateRefreshTimer = Timer.periodic(
+      _powerStateRefreshInterval,
+      (_) => refreshPowerState(),
+    );
+  }
+
+  Future<void> refreshPowerState() async {
+    PowerState? powerState;
+
+    try {
+      powerState = await _nativeLensPlugin.getPowerState();
+    } on PlatformException {
+      return;
+    } on MissingPluginException {
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _powerState = powerState;
     });
   }
 
