@@ -4,11 +4,13 @@ import 'camera_capability.dart';
 import 'compatibility_summary.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
+import 'native_lens_custom_task_result.dart';
 import 'native_lens_dataset_row.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_lens_report.dart';
 import 'native_sensor.dart';
 import 'native_task_risk_result.dart';
+import 'native_lens_task_requirements.dart';
 import 'network_capability.dart';
 import 'network_speed_sample.dart';
 import 'platform_summary.dart';
@@ -242,6 +244,31 @@ class NativeLens {
       requiredCapabilities: signals.requiredCapabilities,
       missingCapabilities: signals.missingCapabilities,
       availableCapabilities: signals.availableCapabilities,
+    );
+  }
+
+  /// Returns a placeholder custom task readiness result.
+  ///
+  /// The public model surface is available now. The real custom requirement
+  /// rule engine will be added in a later step.
+  Future<NativeLensCustomTaskResult> analyzeCustomTask({
+    required String taskName,
+    required NativeLensTaskRequirements requirements,
+  }) async {
+    return NativeLensCustomTaskResult(
+      taskName: taskName,
+      riskLevel: 'low',
+      severity: 'info',
+      canContinue: true,
+      reasons: const <String>[
+        'Custom task analysis rule engine is not implemented yet.',
+      ],
+      recommendations: const <String>[
+        'Rule engine will be added in the next step.',
+      ],
+      userMessage: 'This feature looks ready.',
+      developerMessage: 'Custom task analysis placeholder result.',
+      analyzedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
 

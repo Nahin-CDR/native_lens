@@ -816,6 +816,40 @@ void main() {
     },
   );
 
+  test('analyzeCustomTask returns placeholder result', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+
+    final int beforeAnalysis = DateTime.now().millisecondsSinceEpoch;
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Face Filter Camera',
+          requirements: const NativeLensTaskRequirements(
+            requiresCamera: true,
+            requiredSensors: <String>['gyroscope', 'accelerometer'],
+            requiresStableNetwork: true,
+            minBatteryLevel: 20,
+          ),
+        );
+
+    expect(result, isA<NativeLensCustomTaskResult>());
+    expect(result.taskName, 'Face Filter Camera');
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, isEmpty);
+    expect(result.missingCapabilities, isEmpty);
+    expect(result.availableCapabilities, isEmpty);
+    expect(result.reasons, <String>[
+      'Custom task analysis rule engine is not implemented yet.',
+    ]);
+    expect(result.recommendations, <String>[
+      'Rule engine will be added in the next step.',
+    ]);
+    expect(result.userMessage, 'This feature looks ready.');
+    expect(result.developerMessage, 'Custom task analysis placeholder result.');
+    expect(result.analyzedAtMillis, greaterThanOrEqualTo(beforeAnalysis));
+  });
+
   test('networkCapabilityStream', () async {
     NativeLens nativeLensPlugin = NativeLens();
     MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
