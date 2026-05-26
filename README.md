@@ -40,6 +40,30 @@ Then run:
 flutter pub get
 ```
 
+## Native Splash Setup Preview
+
+NativeLens includes an early setup command for planning native splash screen
+configuration:
+
+```sh
+dart run native_lens:splash --dry-run
+```
+
+Add this preview config to your app `pubspec.yaml`:
+
+```yaml
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: true
+    ios: true
+```
+
+The current command validates the config, checks that the splash image exists,
+detects Android and iOS project folders, and prints the native files that a
+future generator would update. It does not modify Android or iOS files yet.
+
 ## Platform Support
 
 | Platform | Support level |
