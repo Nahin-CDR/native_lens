@@ -16,8 +16,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  static const Duration _powerStateRefreshInterval = Duration(seconds: 30);
-
   final _nativeLensPlugin = NativeLens();
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
@@ -35,7 +33,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   StreamSubscription<DeviceOrientationInfo>? _deviceOrientationSubscription;
-  Timer? _powerStateRefreshTimer;
+  StreamSubscription<PowerState>? _powerStateSubscription;
   bool _isGeneratingReport = false;
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
@@ -47,7 +45,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     initPlatformState();
-    startPowerStateRefreshTimer();
+    listenToPowerState();
     listenToNetworkCapability();
     listenToNetworkSpeed();
     listenToDeviceOrientation();
@@ -56,7 +54,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _powerStateRefreshTimer?.cancel();
+    _powerStateSubscription?.cancel();
     _networkCapabilitySubscription?.cancel();
     _networkSpeedSubscription?.cancel();
     _deviceOrientationSubscription?.cancel();
@@ -117,14 +115,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
-  void startPowerStateRefreshTimer() {
-    _powerStateRefreshTimer?.cancel();
-    _powerStateRefreshTimer = Timer.periodic(
-      _powerStateRefreshInterval,
-      (_) => refreshPowerState(),
-    );
-  }
-
   Future<void> refreshPowerState() async {
     PowerState? powerState;
 
@@ -141,6 +131,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     setState(() {
       _powerState = powerState;
     });
+  }
+
+  void listenToPowerState() {
+    _powerStateSubscription = _nativeLensPlugin.watchPowerState().listen(
+      (PowerState powerState) {
+        if (!mounted) return;
+
+        setState(() {
+          _powerState = powerState;
+        });
+      },
+      onError: (Object error) {
+        // The startup snapshot and lifecycle refresh still provide a safe
+        // fallback if the stream is unavailable in a test or unsupported host.
+      },
+    );
   }
 
   void listenToNetworkCapability() {

@@ -271,6 +271,25 @@ stream.listen((NetworkCapability capability) {
 });
 ```
 
+### Live Power State Stream
+
+Receive event-driven battery and power updates from native platform listeners:
+
+```dart
+StreamBuilder<PowerState>(
+  stream: NativeLens().watchPowerState(),
+  builder: (context, snapshot) {
+    final PowerState? powerState = snapshot.data;
+
+    return Text('${powerState?.batteryLevel ?? 0}%');
+  },
+);
+```
+
+`watchPowerState()` uses Android battery broadcasts and iOS battery
+notifications so apps can update battery and charging UI as native power state
+events arrive.
+
 ### App Traffic Speed Stream
 
 ```dart

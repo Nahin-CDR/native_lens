@@ -133,6 +133,22 @@ class MockNativeLensPlatform
   }
 
   @override
+  Stream<PowerState> watchPowerState() {
+    return Stream<PowerState>.value(
+      const PowerState(
+        batteryLevel: 89,
+        isCharging: true,
+        chargingSource: 'USB',
+        batteryHealth: 'Good',
+        batteryStatus: 'Charging',
+        batteryTemperatureCelsius: 31.6,
+        isPowerSaveMode: false,
+        isIgnoringBatteryOptimizations: false,
+      ),
+    );
+  }
+
+  @override
   Future<NetworkCapability> getNetworkCapability() {
     return Future<NetworkCapability>.value(
       const NetworkCapability(
@@ -484,6 +500,20 @@ void main() {
     expect(powerState.isCharging, true);
     expect(powerState.chargingSource, 'USB');
     expect(powerState.batteryHealth, 'Good');
+  });
+
+  test('watchPowerState', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final PowerState powerState = await nativeLensPlugin
+        .watchPowerState()
+        .first;
+
+    expect(powerState.batteryLevel, 89);
+    expect(powerState.isCharging, true);
+    expect(powerState.chargingSource, 'USB');
   });
 
   test('getNetworkCapability', () async {

@@ -71,6 +71,11 @@ abstract class NativeLensPlatform extends PlatformInterface {
     throw UnimplementedError('getPowerState() has not been implemented.');
   }
 
+  /// Emits native battery and power state updates as the platform reports them.
+  Stream<PowerState> watchPowerState() {
+    throw UnimplementedError('watchPowerState() has not been implemented.');
+  }
+
   /// Returns native Android network capability information for the active network.
   Future<NetworkCapability> getNetworkCapability() {
     throw UnimplementedError(

@@ -31,6 +31,11 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
   private var deviceOrientationSink: FlutterEventSink?
   private var orientationObserver: NSObjectProtocol?
   private var networkSpeedSink: FlutterEventSink?
+  private var powerStateSink: FlutterEventSink?
+  private var batteryLevelObserver: NSObjectProtocol?
+  private var batteryStateObserver: NSObjectProtocol?
+  private var lowPowerModeObserver: NSObjectProtocol?
+  private var wasBatteryMonitoringEnabled = false
   private let monitorQueue = DispatchQueue(label: "native_lens.network_monitor")
 
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -69,6 +74,17 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
       EventChannelHandler(
         onListen: { _, events in instance.startNetworkSpeedStream(events) },
         onCancel: { _ in instance.stopNetworkSpeedStream() }
+      )
+    )
+
+    let powerStateChannel = FlutterEventChannel(
+      name: "native_lens/power_state",
+      binaryMessenger: registrar.messenger()
+    )
+    powerStateChannel.setStreamHandler(
+      EventChannelHandler(
+        onListen: { _, events in instance.startPowerStateStream(events) },
+        onCancel: { _ in instance.stopPowerStateStream() }
       )
     )
   }
@@ -150,14 +166,21 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
     let wasMonitoring = device.isBatteryMonitoringEnabled
     device.isBatteryMonitoringEnabled = true
 
-    let level = Int((device.batteryLevel >= 0 ? device.batteryLevel : 0.0) * 100.0)
-    let state = device.batteryState
-    let status = batteryStatusName(from: state)
-    let isCharging = state == .charging || state == .full
+    let payload = createPowerState()
 
     if !wasMonitoring {
       device.isBatteryMonitoringEnabled = false
     }
+
+    return payload
+  }
+
+  private func createPowerState() -> [String: Any] {
+    let device = UIDevice.current
+    let level = Int((device.batteryLevel >= 0 ? device.batteryLevel : 0.0) * 100.0)
+    let state = device.batteryState
+    let status = batteryStatusName(from: state)
+    let isCharging = state == .charging || state == .full
 
     return [
       "batteryLevel": level,
@@ -318,6 +341,66 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
 
   private func stopNetworkSpeedStream() {
     networkSpeedSink = nil
+  }
+
+  private func startPowerStateStream(_ events: @escaping FlutterEventSink) {
+    stopPowerStateStream()
+
+    let device = UIDevice.current
+    wasBatteryMonitoringEnabled = device.isBatteryMonitoringEnabled
+    device.isBatteryMonitoringEnabled = true
+    powerStateSink = events
+
+    batteryLevelObserver = NotificationCenter.default.addObserver(
+      forName: UIDevice.batteryLevelDidChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.emitPowerStateUpdate()
+    }
+
+    batteryStateObserver = NotificationCenter.default.addObserver(
+      forName: UIDevice.batteryStateDidChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.emitPowerStateUpdate()
+    }
+
+    lowPowerModeObserver = NotificationCenter.default.addObserver(
+      forName: .NSProcessInfoPowerStateDidChange,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.emitPowerStateUpdate()
+    }
+
+    emitPowerStateUpdate()
+  }
+
+  private func stopPowerStateStream() {
+    if let observer = batteryLevelObserver {
+      NotificationCenter.default.removeObserver(observer)
+      batteryLevelObserver = nil
+    }
+    if let observer = batteryStateObserver {
+      NotificationCenter.default.removeObserver(observer)
+      batteryStateObserver = nil
+    }
+    if let observer = lowPowerModeObserver {
+      NotificationCenter.default.removeObserver(observer)
+      lowPowerModeObserver = nil
+    }
+
+    powerStateSink = nil
+
+    if !wasBatteryMonitoringEnabled {
+      UIDevice.current.isBatteryMonitoringEnabled = false
+    }
+  }
+
+  private func emitPowerStateUpdate() {
+    powerStateSink?(createPowerState())
   }
 
   private func createDeviceOrientation(

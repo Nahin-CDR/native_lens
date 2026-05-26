@@ -15,6 +15,9 @@ void main() {
 
   MethodChannelNativeLens platform = MethodChannelNativeLens();
   const MethodChannel channel = MethodChannel('native_lens');
+  const EventChannel powerStateChannel = EventChannel(
+    'native_lens/power_state',
+  );
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -152,6 +155,8 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockStreamHandler(powerStateChannel, null);
   });
 
   test('getPlatformSummary', () async {
@@ -257,6 +262,36 @@ void main() {
     expect(powerState.batteryTemperatureCelsius, 31.5);
     expect(powerState.isPowerSaveMode, false);
     expect(powerState.isIgnoringBatteryOptimizations, false);
+  });
+
+  test('watchPowerState parses stream events', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockStreamHandler(
+          powerStateChannel,
+          MockStreamHandler.inline(
+            onListen: (Object? arguments, MockStreamHandlerEventSink events) {
+              events.success(<String, Object>{
+                'batteryLevel': 72,
+                'isCharging': true,
+                'chargingSource': 'USB',
+                'batteryHealth': 'Good',
+                'batteryStatus': 'Charging',
+                'batteryTemperatureCelsius': 30.5,
+                'isPowerSaveMode': false,
+                'isIgnoringBatteryOptimizations': false,
+              });
+              events.endOfStream();
+            },
+          ),
+        );
+
+    final PowerState powerState = await platform.watchPowerState().first;
+
+    expect(powerState.batteryLevel, 72);
+    expect(powerState.isCharging, true);
+    expect(powerState.chargingSource, 'USB');
+    expect(powerState.batteryStatus, 'Charging');
+    expect(powerState.batteryTemperatureCelsius, 30.5);
   });
 
   test('getNetworkCapability', () async {

@@ -74,6 +74,12 @@ class NativeLens {
     return NativeLensPlatform.instance.getPowerState();
   }
 
+  /// Emits native battery and power state updates while the platform reports
+  /// battery or power state changes.
+  Stream<PowerState> watchPowerState() {
+    return NativeLensPlatform.instance.watchPowerState();
+  }
+
   /// Returns native Android network capability information for the active network.
   Future<NetworkCapability> getNetworkCapability() {
     return NativeLensPlatform.instance.getNetworkCapability();

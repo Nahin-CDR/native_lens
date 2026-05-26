@@ -1,3 +1,8 @@
+## Unreleased
+
+- Added event-driven `watchPowerState()` stream for live battery and power updates.
+- Updated the example dashboard to use the live power state stream.
+
 ## 0.5.0
 
 Release date: 2026-05-26

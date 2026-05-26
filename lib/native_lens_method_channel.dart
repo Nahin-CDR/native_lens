@@ -37,6 +37,10 @@ class MethodChannelNativeLens extends NativeLensPlatform {
     'native_lens/device_orientation',
   );
 
+  /// The event channel used to receive live power state updates.
+  @visibleForTesting
+  final powerStateEventChannel = const EventChannel('native_lens/power_state');
+
   @override
   Future<PlatformSummary> getPlatformSummary() async {
     final Map<Object?, Object?>? summaryMap = await methodChannel
@@ -175,6 +179,17 @@ class MethodChannelNativeLens extends NativeLensPlatform {
   }
 
   @override
+  Stream<PowerState> watchPowerState() {
+    return powerStateEventChannel.receiveBroadcastStream().map((Object? event) {
+      if (event is Map<Object?, Object?>) {
+        return PowerState.fromMap(event);
+      }
+
+      return PowerState.fromMap(<Object?, Object?>{});
+    });
+  }
+
+  @override
   Future<NetworkCapability> getNetworkCapability() async {
     final Map<Object?, Object?>? networkMap = await methodChannel
         .invokeMapMethod<Object?, Object?>('getNetworkCapability');
@@ -219,15 +234,15 @@ class MethodChannelNativeLens extends NativeLensPlatform {
 
   @override
   Stream<DeviceOrientationInfo> get deviceOrientationStream {
-    return deviceOrientationEventChannel.receiveBroadcastStream().map(
-      (Object? event) {
-        if (event is Map<Object?, Object?>) {
-          return DeviceOrientationInfo.fromMap(event);
-        }
+    return deviceOrientationEventChannel.receiveBroadcastStream().map((
+      Object? event,
+    ) {
+      if (event is Map<Object?, Object?>) {
+        return DeviceOrientationInfo.fromMap(event);
+      }
 
-        return DeviceOrientationInfo.fromMap(<Object?, Object?>{});
-      },
-    );
+      return DeviceOrientationInfo.fromMap(<Object?, Object?>{});
+    });
   }
 
   @override

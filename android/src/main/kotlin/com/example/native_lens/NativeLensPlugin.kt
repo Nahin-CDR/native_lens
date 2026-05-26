@@ -1,6 +1,7 @@
 package com.example.native_lens
 
 import android.content.Context
+import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.FeatureInfo
@@ -47,6 +48,7 @@ class NativeLensPlugin :
     private lateinit var networkSpeedChannel: EventChannel
     private lateinit var networkCapabilityChannel: EventChannel
     private lateinit var deviceOrientationChannel: EventChannel
+    private lateinit var powerStateChannel: EventChannel
     private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
     private lateinit var cameraManager: CameraManager
@@ -58,7 +60,9 @@ class NativeLensPlugin :
     private var networkSpeedEvents: EventChannel.EventSink? = null
     private var networkCapabilityEvents: EventChannel.EventSink? = null
     private var deviceOrientationEvents: EventChannel.EventSink? = null
+    private var powerStateEvents: EventChannel.EventSink? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var powerStateReceiver: BroadcastReceiver? = null
     private var orientationEventListener: OrientationEventListener? = null
     private var previousRxBytes = 0L
     private var previousTxBytes = 0L
@@ -120,6 +124,22 @@ class NativeLensPlugin :
 
                 override fun onCancel(arguments: Any?) {
                     stopDeviceOrientationStream()
+                }
+            }
+        )
+        powerStateChannel =
+            EventChannel(flutterPluginBinding.binaryMessenger, "native_lens/power_state")
+        powerStateChannel.setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(
+                    arguments: Any?,
+                    events: EventChannel.EventSink
+                ) {
+                    startPowerStateStream(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopPowerStateStream()
                 }
             }
         )
@@ -629,7 +649,10 @@ class NativeLensPlugin :
     }
 
     private fun getPowerState(): Map<String, Any> {
-        val batteryIntent = getBatteryIntent()
+        return createPowerState(getBatteryIntent())
+    }
+
+    private fun createPowerState(batteryIntent: Intent?): Map<String, Any> {
         val batteryLevel = getBatteryLevel(batteryIntent)
         val batteryStatus = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val batteryHealth = batteryIntent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
@@ -649,6 +672,69 @@ class NativeLensPlugin :
             "isPowerSaveMode" to isPowerSaveModeEnabled(),
             "isIgnoringBatteryOptimizations" to isIgnoringBatteryOptimizations()
         )
+    }
+
+    private fun startPowerStateStream(events: EventChannel.EventSink) {
+        stopPowerStateStream()
+        powerStateEvents = events
+
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(
+                    context: Context?,
+                    intent: Intent?
+                ) {
+                    val batteryIntent =
+                        if (intent?.action == Intent.ACTION_BATTERY_CHANGED) {
+                            intent
+                        } else {
+                            getBatteryIntent()
+                        }
+
+                    emitPowerStateUpdate(batteryIntent)
+                }
+            }
+
+        powerStateReceiver = receiver
+
+        try {
+            val powerStateFilter =
+                IntentFilter().apply {
+                    addAction(Intent.ACTION_BATTERY_CHANGED)
+                    addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+                }
+
+            applicationContext.registerReceiver(receiver, powerStateFilter)
+            emitPowerStateUpdate(getBatteryIntent())
+        } catch (exception: RuntimeException) {
+            powerStateReceiver = null
+            emitPowerStateUpdate(getBatteryIntent())
+        }
+    }
+
+    private fun stopPowerStateStream() {
+        val receiver = powerStateReceiver
+
+        if (receiver != null) {
+            try {
+                applicationContext.unregisterReceiver(receiver)
+            } catch (exception: RuntimeException) {
+                // The receiver may already be unregistered while the engine is detaching.
+            }
+        }
+
+        powerStateReceiver = null
+        powerStateEvents = null
+    }
+
+    private fun emitPowerStateUpdate(batteryIntent: Intent?) {
+        if (powerStateEvents == null) {
+            return
+        }
+
+        networkSpeedHandler.post {
+            powerStateEvents?.success(createPowerState(batteryIntent))
+        }
     }
 
     private fun getBatteryIntent(): Intent? {
@@ -1069,9 +1155,11 @@ class NativeLensPlugin :
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        stopPowerStateStream()
         stopNetworkCapabilityStream()
         stopNetworkSpeedStream()
         stopDeviceOrientationStream()
+        powerStateChannel.setStreamHandler(null)
         networkCapabilityChannel.setStreamHandler(null)
         networkSpeedChannel.setStreamHandler(null)
         deviceOrientationChannel.setStreamHandler(null)
