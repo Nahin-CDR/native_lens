@@ -757,7 +757,6 @@ String buildAndroidV31StylesXml() {
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowSplashScreenBackground">@color/native_lens_splash_background</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/native_lens_splash</item>
-        <item name="android:postSplashScreenTheme">@style/NormalTheme</item>
     </style>
 </resources>
 ''';

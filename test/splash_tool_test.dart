@@ -333,6 +333,7 @@ native_lens:
     );
     expect(v31Styles, contains('windowSplashScreenBackground'));
     expect(v31Styles, contains('windowSplashScreenAnimatedIcon'));
+    expect(v31Styles, isNot(contains('android:postSplashScreenTheme')));
   });
 
   test('Android generation rolls back when a write fails', () {
