@@ -1,7 +1,14 @@
-## Unreleased
+## 0.6.0
 
-- Added event-driven `watchPowerState()` stream for live battery and power updates.
-- Updated the example dashboard to use the live power state stream.
+Release date: 2026-05-26
+
+- Added `watchPowerState()`.
+- Added event-driven live `PowerState` stream.
+- Added Android `BroadcastReceiver` support for battery and power saver changes.
+- Added iOS `UIDevice` battery and low power mode notification support.
+- Updated the example app to use the live power stream instead of timer polling.
+- Kept the `getPowerState()` snapshot API unchanged.
+- Added no new dependencies.
 
 ## 0.5.0
 
