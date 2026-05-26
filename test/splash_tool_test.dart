@@ -391,6 +391,243 @@ native_lens:
       isFalse,
     );
   });
+
+  test('iOS file plan includes generated files and backup intent', () {
+    _writeProject(
+      tempDirectory,
+      pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: false
+    ios: true
+''',
+    );
+    _writeIosProject(tempDirectory);
+
+    final NativeLensSplashPlan plan = buildSplashPlan(
+      workingDirectory: tempDirectory,
+    );
+
+    final List<String> paths = plan.plannedFiles
+        .map((NativeLensSplashFilePlan file) => file.relativePath)
+        .toList();
+
+    expect(paths, contains('ios/Runner/Base.lproj/LaunchScreen.storyboard'));
+    expect(
+      paths,
+      contains(
+        'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/Contents.json',
+      ),
+    );
+    expect(
+      paths,
+      contains(
+        'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/native_lens_splash.png',
+      ),
+    );
+    expect(
+      plan.plannedFiles.every(
+        (NativeLensSplashFilePlan file) => file.willBackup,
+      ),
+      isTrue,
+    );
+  });
+
+  test('dry-run does not write iOS files or backup folders', () async {
+    _writeProject(
+      tempDirectory,
+      pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: false
+    ios: true
+''',
+    );
+    _writeIosProject(tempDirectory);
+
+    final String originalStoryboard = _readProjectFile(
+      tempDirectory,
+      'ios/Runner/Base.lproj/LaunchScreen.storyboard',
+    );
+    final int exitCode = await runNativeLensSplash(
+      <String>['--dry-run'],
+      workingDirectory: tempDirectory,
+      stdoutWriter: (_) {},
+      stderrWriter: (_) {},
+    );
+
+    expect(exitCode, 0);
+    expect(
+      _readProjectFile(
+        tempDirectory,
+        'ios/Runner/Base.lproj/LaunchScreen.storyboard',
+      ),
+      originalStoryboard,
+    );
+    expect(
+      Directory(
+        [
+          tempDirectory.path,
+          'ios',
+          'Runner',
+          'Assets.xcassets',
+          'NativeLensSplash.imageset',
+        ].join(Platform.pathSeparator),
+      ).existsSync(),
+      isFalse,
+    );
+    expect(
+      Directory(
+        [
+          tempDirectory.path,
+          '.native_lens_backup',
+          'splash',
+        ].join(Platform.pathSeparator),
+      ).existsSync(),
+      isFalse,
+    );
+  });
+
+  test(
+    'iOS generation creates storyboard, asset catalog, and backup manifest',
+    () {
+      _writeProject(
+        tempDirectory,
+        pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: false
+    ios: true
+''',
+      );
+      _writeIosProject(tempDirectory);
+
+      final NativeLensSplashPlan plan = buildSplashPlan(
+        workingDirectory: tempDirectory,
+      );
+      final NativeLensSplashGenerationResult result = generateIosSplash(
+        plan,
+        timestamp: '20260526_120000_002',
+      );
+
+      expect(File(result.manifestPath).existsSync(), isTrue);
+      final Map<String, Object?> manifest =
+          jsonDecode(File(result.manifestPath).readAsStringSync())
+              as Map<String, Object?>;
+      expect(manifest['tool'], 'native_lens:splash');
+      expect(manifest['phase'], 'ios');
+      expect(
+        result.generatedFiles,
+        contains('ios/Runner/Base.lproj/LaunchScreen.storyboard'),
+      );
+
+      final String storyboard = _readProjectFile(
+        tempDirectory,
+        'ios/Runner/Base.lproj/LaunchScreen.storyboard',
+      );
+      expect(storyboard, contains('red="0.043137"'));
+      expect(storyboard, contains('green="0.062745"'));
+      expect(storyboard, contains('blue="0.125490"'));
+      expect(storyboard, contains('image="NativeLensSplash"'));
+      expect(storyboard, contains('launchScreen="YES"'));
+
+      final String contentsJson = _readProjectFile(
+        tempDirectory,
+        'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/Contents.json',
+      );
+      final Map<String, Object?> contents =
+          jsonDecode(contentsJson) as Map<String, Object?>;
+      expect(contents['info'], isA<Map<String, Object?>>());
+      expect(contentsJson, contains('native_lens_splash.png'));
+      expect(contentsJson, contains('"idiom": "universal"'));
+
+      expect(
+        File(
+          [
+            tempDirectory.path,
+            'ios',
+            'Runner',
+            'Assets.xcassets',
+            'NativeLensSplash.imageset',
+            'native_lens_splash.png',
+          ].join(Platform.pathSeparator),
+        ).readAsBytesSync(),
+        <int>[0, 1, 2, 3],
+      );
+
+      final List<Object?> files = manifest['files'] as List<Object?>;
+      expect(
+        files.whereType<Map<String, Object?>>().map(
+          (Map<String, Object?> file) => file['relativePath'],
+        ),
+        contains(
+          'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/native_lens_splash.png',
+        ),
+      );
+    },
+  );
+
+  test('iOS generation rolls back when a write fails', () {
+    _writeProject(
+      tempDirectory,
+      pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: false
+    ios: true
+''',
+    );
+    _writeIosProject(tempDirectory);
+
+    final String originalStoryboard = _readProjectFile(
+      tempDirectory,
+      'ios/Runner/Base.lproj/LaunchScreen.storyboard',
+    );
+    final NativeLensSplashPlan plan = buildSplashPlan(
+      workingDirectory: tempDirectory,
+    );
+
+    expect(
+      () => generateIosSplash(
+        plan,
+        timestamp: '20260526_120000_003',
+        simulateFailureAfterFirstWrite: true,
+      ),
+      throwsA(isA<NativeLensSplashException>()),
+    );
+
+    expect(
+      _readProjectFile(
+        tempDirectory,
+        'ios/Runner/Base.lproj/LaunchScreen.storyboard',
+      ),
+      originalStoryboard,
+    );
+    expect(
+      Directory(
+        [
+          tempDirectory.path,
+          'ios',
+          'Runner',
+          'Assets.xcassets',
+          'NativeLensSplash.imageset',
+        ].join(Platform.pathSeparator),
+      ).existsSync(),
+      isFalse,
+    );
+  });
 }
 
 void _writeProject(
@@ -502,6 +739,34 @@ void _writeAndroidProject(Directory directory) {
     )
     ..createSync(recursive: true)
     ..writeAsStringSync('<layer-list />');
+}
+
+void _writeIosProject(Directory directory) {
+  File(
+      [
+        directory.path,
+        'ios',
+        'Runner',
+        'Base.lproj',
+        'LaunchScreen.storyboard',
+      ].join(Platform.pathSeparator),
+    )
+    ..createSync(recursive: true)
+    ..writeAsStringSync('''
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" launchScreen="YES">
+    <scenes />
+</document>
+''');
+
+  Directory(
+    [
+      directory.path,
+      'ios',
+      'Runner',
+      'Assets.xcassets',
+    ].join(Platform.pathSeparator),
+  ).createSync(recursive: true);
 }
 
 String _readProjectFile(Directory directory, String relativePath) {

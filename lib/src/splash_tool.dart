@@ -123,7 +123,7 @@ const List<String> androidGeneratedRelativePaths = <String>[
 const List<String> iosPlannedRelativePaths = <String>[
   'ios/Runner/Base.lproj/LaunchScreen.storyboard',
   'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/Contents.json',
-  'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/splash.png',
+  'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/native_lens_splash.png',
 ];
 
 Future<int> runNativeLensSplash(
@@ -172,8 +172,17 @@ Future<int> runNativeLensSplash(
       }
 
       if (plan.platforms.ios) {
-        out('iOS splash generation is not implemented yet.');
-        out('No iOS files were modified.');
+        final NativeLensSplashGenerationResult result = generateIosSplash(plan);
+        out('iOS native splash files generated.');
+        out('Backup: ${result.backupDirectory}');
+        out('Manifest: ${result.manifestPath}');
+        out('Generated files:');
+        for (final String file in result.generatedFiles) {
+          out('  - $file');
+        }
+        for (final String warning in result.warnings) {
+          out('Warning: $warning');
+        }
       }
     }
 
@@ -408,8 +417,10 @@ List<NativeLensSplashFilePlan> buildPlannedFiles({
       files.add(
         NativeLensSplashFilePlan(
           relativePath: relativePath,
-          action: 'planned',
-          willBackup: false,
+          action: File(_join(projectRoot.path, relativePath)).existsSync()
+              ? 'modify'
+              : 'create',
+          willBackup: true,
         ),
       );
     }
@@ -458,8 +469,14 @@ List<String> buildPlanWarnings({
     }
   }
 
-  if (platforms.ios && iosProjectPath == null) {
-    warnings.add('iOS project folder was not found.');
+  if (platforms.ios) {
+    if (iosProjectPath == null) {
+      warnings.add('iOS project folder was not found.');
+    } else if (!Directory(
+      _join(projectRoot.path, 'ios', 'Runner'),
+    ).existsSync()) {
+      warnings.add('iOS Runner project was not found at ios/Runner.');
+    }
   }
 
   return warnings;
@@ -495,7 +512,7 @@ NativeLensSplashGenerationResult generateAndroidSplash(
     projectRoot,
     timestamp: timestamp,
   );
-  final List<NativeLensSplashBackupEntry> backupEntries = backupAndroidFiles(
+  final List<NativeLensSplashBackupEntry> backupEntries = backupSplashFiles(
     projectRoot: projectRoot,
     backupDirectory: backupDirectory,
     files: androidFiles,
@@ -504,6 +521,7 @@ NativeLensSplashGenerationResult generateAndroidSplash(
   final File manifestFile = File(_join(backupDirectory.path, 'manifest.json'));
   writeBackupManifest(
     manifestFile: manifestFile,
+    phase: 'android',
     projectRoot: projectRoot,
     backupDirectory: backupDirectory,
     entries: backupEntries,
@@ -576,6 +594,103 @@ NativeLensSplashGenerationResult generateAndroidSplash(
   );
 }
 
+NativeLensSplashGenerationResult generateIosSplash(
+  NativeLensSplashPlan plan, {
+  String? timestamp,
+  bool simulateFailureAfterFirstWrite = false,
+}) {
+  if (!plan.platforms.ios) {
+    throw const NativeLensSplashException('iOS splash is not selected.');
+  }
+
+  final Directory projectRoot = Directory(plan.projectRoot);
+  final Directory iosRunnerDirectory = Directory(
+    _join(projectRoot.path, 'ios', 'Runner'),
+  );
+  if (!iosRunnerDirectory.existsSync()) {
+    throw const NativeLensSplashException(
+      'iOS Runner project was not found at ios/Runner.',
+    );
+  }
+
+  final List<NativeLensSplashFilePlan> iosFiles = plan.plannedFiles
+      .where(
+        (NativeLensSplashFilePlan file) =>
+            iosPlannedRelativePaths.contains(file.relativePath),
+      )
+      .toList(growable: false);
+
+  final Directory backupDirectory = createBackupDirectory(
+    projectRoot,
+    timestamp: timestamp,
+  );
+  final List<NativeLensSplashBackupEntry> backupEntries = backupSplashFiles(
+    projectRoot: projectRoot,
+    backupDirectory: backupDirectory,
+    files: iosFiles,
+  );
+
+  final File manifestFile = File(_join(backupDirectory.path, 'manifest.json'));
+  writeBackupManifest(
+    manifestFile: manifestFile,
+    phase: 'ios',
+    projectRoot: projectRoot,
+    backupDirectory: backupDirectory,
+    entries: backupEntries,
+  );
+
+  final Map<String, String> textWrites = <String, String>{
+    'ios/Runner/Base.lproj/LaunchScreen.storyboard':
+        buildIosLaunchScreenStoryboard(
+          backgroundColor: plan.config.backgroundColor,
+        ),
+    'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/Contents.json':
+        buildIosContentsJson(),
+  };
+  final Map<String, List<int>> binaryWrites = <String, List<int>>{
+    'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/native_lens_splash.png':
+        File(_join(projectRoot.path, plan.config.imagePath)).readAsBytesSync(),
+  };
+
+  final List<String> generatedFiles = <String>[];
+  try {
+    var writeCount = 0;
+
+    for (final MapEntry<String, String> entry in textWrites.entries) {
+      _writeTextFile(projectRoot, entry.key, entry.value);
+      generatedFiles.add(entry.key);
+      writeCount += 1;
+      if (simulateFailureAfterFirstWrite && writeCount == 1) {
+        throw const NativeLensSplashException(
+          'Simulated iOS splash generation failure.',
+        );
+      }
+    }
+
+    for (final MapEntry<String, List<int>> entry in binaryWrites.entries) {
+      _writeBinaryFile(projectRoot, entry.key, entry.value);
+      generatedFiles.add(entry.key);
+    }
+  } catch (error) {
+    restoreBackup(
+      projectRoot: projectRoot,
+      backupDirectory: backupDirectory,
+      entries: backupEntries,
+    );
+    throw NativeLensSplashException(
+      'iOS splash generation failed and rollback was completed: $error',
+    );
+  }
+
+  return NativeLensSplashGenerationResult(
+    backupDirectory: backupDirectory.path,
+    manifestPath: manifestFile.path,
+    generatedFiles: generatedFiles,
+    restoredAfterFailure: false,
+    warnings: plan.warnings,
+  );
+}
+
 Directory createBackupDirectory(Directory projectRoot, {String? timestamp}) {
   final String baseTimestamp = timestamp ?? _timestamp();
   final Directory backupRoot = Directory(
@@ -598,7 +713,7 @@ Directory createBackupDirectory(Directory projectRoot, {String? timestamp}) {
   }
 }
 
-List<NativeLensSplashBackupEntry> backupAndroidFiles({
+List<NativeLensSplashBackupEntry> backupSplashFiles({
   required Directory projectRoot,
   required Directory backupDirectory,
   required List<NativeLensSplashFilePlan> files,
@@ -637,6 +752,7 @@ List<NativeLensSplashBackupEntry> backupAndroidFiles({
 
 void writeBackupManifest({
   required File manifestFile,
+  required String phase,
   required Directory projectRoot,
   required Directory backupDirectory,
   required List<NativeLensSplashBackupEntry> entries,
@@ -644,7 +760,7 @@ void writeBackupManifest({
   manifestFile.writeAsStringSync(
     const JsonEncoder.withIndent('  ').convert(<String, Object?>{
       'tool': 'native_lens:splash',
-      'phase': 'android',
+      'phase': phase,
       'projectRoot': projectRoot.path,
       'backupDirectory': backupDirectory.path,
       'files': entries
@@ -776,11 +892,125 @@ String buildAndroidLaunchBackgroundXml() {
 ''';
 }
 
+String buildIosLaunchScreenStoryboard({required String backgroundColor}) {
+  final _IosColor color = _parseIosColor(backgroundColor);
+
+  return '''
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="native-lens-launch">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23506"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <scene sceneID="native-lens-scene">
+            <objects>
+                <viewController id="native-lens-launch" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="native-lens-root-view">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="NativeLensSplash" translatesAutoresizingMaskIntoConstraints="NO" id="native-lens-splash-image">
+                                <rect key="frame" x="136.5" y="366" width="120" height="120"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="120" id="native-lens-image-width"/>
+                                    <constraint firstAttribute="height" constant="120" id="native-lens-image-height"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="native-lens-safe-area"/>
+                        <color key="backgroundColor" red="${color.red}" green="${color.green}" blue="${color.blue}" alpha="${color.alpha}" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="native-lens-splash-image" firstAttribute="centerX" secondItem="native-lens-root-view" secondAttribute="centerX" id="native-lens-center-x"/>
+                            <constraint firstItem="native-lens-splash-image" firstAttribute="centerY" secondItem="native-lens-root-view" secondAttribute="centerY" id="native-lens-center-y"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="native-lens-first-responder" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="NativeLensSplash" width="120" height="120"/>
+    </resources>
+</document>
+''';
+}
+
+String buildIosContentsJson() {
+  return const JsonEncoder.withIndent('  ').convert(<String, Object?>{
+    'images': <Object>[
+      <String, String>{
+        'filename': 'native_lens_splash.png',
+        'idiom': 'universal',
+        'scale': '1x',
+      },
+    ],
+    'info': <String, Object>{'author': 'native_lens', 'version': 1},
+  });
+}
+
 String _androidLaunchThemeXml() {
   return '''
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>''';
+}
+
+class _IosColor {
+  const _IosColor({
+    required this.red,
+    required this.green,
+    required this.blue,
+    required this.alpha,
+  });
+
+  final String red;
+  final String green;
+  final String blue;
+  final String alpha;
+}
+
+_IosColor _parseIosColor(String color) {
+  final String hex = color.substring(1);
+  final int alpha;
+  final int red;
+  final int green;
+  final int blue;
+
+  if (hex.length == 8) {
+    alpha = int.parse(hex.substring(0, 2), radix: 16);
+    red = int.parse(hex.substring(2, 4), radix: 16);
+    green = int.parse(hex.substring(4, 6), radix: 16);
+    blue = int.parse(hex.substring(6, 8), radix: 16);
+  } else {
+    alpha = 255;
+    red = int.parse(hex.substring(0, 2), radix: 16);
+    green = int.parse(hex.substring(2, 4), radix: 16);
+    blue = int.parse(hex.substring(4, 6), radix: 16);
+  }
+
+  return _IosColor(
+    red: _formatIosColorValue(red),
+    green: _formatIosColorValue(green),
+    blue: _formatIosColorValue(blue),
+    alpha: _formatIosColorValue(alpha),
+  );
+}
+
+String _formatIosColorValue(int value) {
+  if (value == 0) {
+    return '0.0';
+  }
+  if (value == 255) {
+    return '1.0';
+  }
+
+  return (value / 255).toStringAsFixed(6);
 }
 
 String? _readOptionalFile(Directory projectRoot, String relativePath) {
@@ -889,8 +1119,9 @@ String formatSplashPlan(NativeLensSplashPlan plan, {required bool dryRun}) {
   if (dryRun) {
     lines.add('No Android or iOS files were modified.');
   } else {
-    lines.add('Selected Android files will be generated after this preview.');
-    lines.add('iOS files are not generated in this phase.');
+    lines.add(
+      'Selected native splash files will be generated after this preview.',
+    );
   }
 
   return lines.join('\n');

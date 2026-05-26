@@ -64,20 +64,23 @@ The dry run validates the config, checks that the splash image exists, detects
 Android and iOS project folders, and prints the native files that would be
 created, modified, or backed up.
 
-Android generation is available now:
+Android and iOS generation are available now:
 
 ```sh
 dart run native_lens:splash --android
+dart run native_lens:splash --ios
 ```
 
-Before Android files are changed, NativeLens creates a backup under:
+Before native files are changed, NativeLens creates a backup under:
 
 ```text
 .native_lens_backup/splash/<timestamp>/
 ```
 
-If Android generation fails mid-run, NativeLens restores the files from the
-current backup automatically. iOS generation is not implemented yet.
+If generation fails mid-run, NativeLens restores the files from the current
+backup automatically. iOS generation updates the static launch screen storyboard
+and writes a `NativeLensSplash.imageset` asset catalog entry; the LaunchScreen
+stays static and launch-screen safe.
 
 ## Platform Support
 
