@@ -816,8 +816,10 @@ void main() {
     },
   );
 
-  test('analyzeCustomTask returns placeholder result', () async {
+  test('analyzeCustomTask returns low risk for healthy requirements', () async {
     NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
 
     final int beforeAnalysis = DateTime.now().millisecondsSinceEpoch;
     final NativeLensCustomTaskResult result = await nativeLensPlugin
@@ -825,7 +827,7 @@ void main() {
           taskName: 'Face Filter Camera',
           requirements: const NativeLensTaskRequirements(
             requiresCamera: true,
-            requiredSensors: <String>['gyroscope', 'accelerometer'],
+            requiredSensors: <String>['accelerometer'],
             requiresStableNetwork: true,
             minBatteryLevel: 20,
           ),
@@ -836,19 +838,125 @@ void main() {
     expect(result.riskLevel, 'low');
     expect(result.severity, 'info');
     expect(result.canContinue, isTrue);
-    expect(result.requiredCapabilities, isEmpty);
+    expect(result.requiredCapabilities, contains('camera capability'));
+    expect(result.requiredCapabilities, contains('stable network'));
+    expect(result.requiredCapabilities, contains('accelerometer sensor'));
+    expect(result.requiredCapabilities, contains('battery level >= 20%'));
     expect(result.missingCapabilities, isEmpty);
-    expect(result.availableCapabilities, isEmpty);
-    expect(result.reasons, <String>[
-      'Custom task analysis rule engine is not implemented yet.',
-    ]);
-    expect(result.recommendations, <String>[
-      'Rule engine will be added in the next step.',
-    ]);
-    expect(result.userMessage, 'This feature looks ready.');
-    expect(result.developerMessage, 'Custom task analysis placeholder result.');
+    expect(result.availableCapabilities, contains('camera capability'));
+    expect(result.availableCapabilities, contains('stable network'));
+    expect(result.availableCapabilities, contains('accelerometer sensor'));
+    expect(result.availableCapabilities, contains('battery level >= 20%'));
+    expect(result.reasons, contains('Camera capability is available.'));
+    expect(result.recommendations, <String>['Continue with the custom task.']);
+    expect(result.userMessage, contains('Face Filter Camera looks ready'));
+    expect(result.developerMessage, contains('riskLevel=low'));
     expect(result.analyzedAtMillis, greaterThanOrEqualTo(beforeAnalysis));
   });
+
+  test('analyzeCustomTask returns high risk when camera is missing', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNoCameraPlatform fakePlatform = MockNoCameraPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Camera Scan',
+          requirements: const NativeLensTaskRequirements(requiresCamera: true),
+        );
+
+    expect(result.riskLevel, 'high');
+    expect(result.severity, 'critical');
+    expect(result.canContinue, isFalse);
+    expect(result.requiredCapabilities, contains('camera capability'));
+    expect(result.missingCapabilities, contains('camera capability'));
+    expect(
+      result.reasons,
+      contains('Camera capability is required but unavailable.'),
+    );
+    expect(result.userMessage, contains('cannot continue'));
+  });
+
+  test(
+    'analyzeCustomTask returns high risk when gyroscope is missing',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'AR Preview',
+            requirements: const NativeLensTaskRequirements(
+              requiredSensors: <String>['gyroscope'],
+            ),
+          );
+
+      expect(result.riskLevel, 'high');
+      expect(result.severity, 'critical');
+      expect(result.canContinue, isFalse);
+      expect(result.requiredCapabilities, contains('gyroscope sensor'));
+      expect(result.missingCapabilities, contains('gyroscope sensor'));
+      expect(
+        result.reasons,
+        contains('Gyroscope sensor is required but unavailable.'),
+      );
+    },
+  );
+
+  test(
+    'analyzeCustomTask returns high risk when required network is disconnected',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockDisconnectedNetworkPlatform fakePlatform =
+          MockDisconnectedNetworkPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'Live Sync',
+            requirements: const NativeLensTaskRequirements(
+              requiresStableNetwork: true,
+            ),
+          );
+
+      expect(result.riskLevel, 'high');
+      expect(result.severity, 'critical');
+      expect(result.canContinue, isFalse);
+      expect(result.requiredCapabilities, contains('stable network'));
+      expect(result.missingCapabilities, contains('stable network'));
+      expect(
+        result.reasons,
+        contains('Stable network is required but disconnected.'),
+      );
+    },
+  );
+
+  test(
+    'analyzeCustomTask keeps low battery continuable without hard failures',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockLowBatteryPlatform fakePlatform = MockLowBatteryPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'Offline Export',
+            requirements: const NativeLensTaskRequirements(minBatteryLevel: 20),
+          );
+
+      expect(result.riskLevel, isIn(<String>['medium', 'high']));
+      expect(result.severity, isIn(<String>['warning', 'critical']));
+      expect(result.canContinue, isTrue);
+      expect(result.requiredCapabilities, contains('battery level >= 20%'));
+      expect(result.missingCapabilities, contains('battery level >= 20%'));
+      expect(
+        result.reasons,
+        contains('Battery is 8%, below the required 20%.'),
+      );
+      expect(result.userMessage, contains('may work'));
+    },
+  );
 
   test('networkCapabilityStream', () async {
     NativeLens nativeLensPlugin = NativeLens();

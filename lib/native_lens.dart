@@ -247,29 +247,280 @@ class NativeLens {
     );
   }
 
-  /// Returns a placeholder custom task readiness result.
-  ///
-  /// The public model surface is available now. The real custom requirement
-  /// rule engine will be added in a later step.
+  /// Analyzes developer-defined task requirements using existing NativeLens
+  /// device signals.
   Future<NativeLensCustomTaskResult> analyzeCustomTask({
     required String taskName,
     required NativeLensTaskRequirements requirements,
   }) async {
+    final _CustomTaskSignals signals = _CustomTaskSignals();
+
+    if (requirements.requiresCamera) {
+      await _evaluateCustomCameraRequirement(signals);
+    }
+
+    if (requirements.requiresStableNetwork) {
+      await _evaluateCustomStableNetworkRequirement(signals);
+    }
+
+    final int? minBatteryLevel = requirements.minBatteryLevel;
+    if (minBatteryLevel != null) {
+      await _evaluateCustomBatteryRequirement(minBatteryLevel, signals);
+    }
+
+    if (requirements.requiredSensors.isNotEmpty) {
+      final List<NativeSensor> sensors = await getSensors();
+      for (final String requiredSensor in requirements.requiredSensors) {
+        _evaluateCustomSensorRequirement(requiredSensor, sensors, signals);
+      }
+    }
+
+    if (signals.reasons.isEmpty) {
+      signals.addAvailableCapability('basic device readiness');
+      signals.addInfo('No blocking custom task requirements were detected.');
+    }
+
+    final String riskLevel = _customRiskLevelForSignals(signals);
+    final String severity = _customSeverityForRiskLevel(riskLevel);
+
     return NativeLensCustomTaskResult(
       taskName: taskName,
-      riskLevel: 'low',
-      severity: 'info',
-      canContinue: true,
-      reasons: const <String>[
-        'Custom task analysis rule engine is not implemented yet.',
-      ],
-      recommendations: const <String>[
-        'Rule engine will be added in the next step.',
-      ],
-      userMessage: 'This feature looks ready.',
-      developerMessage: 'Custom task analysis placeholder result.',
+      riskLevel: riskLevel,
+      severity: severity,
+      canContinue: signals.hardFailureCount == 0,
+      requiredCapabilities: signals.requiredCapabilities,
+      missingCapabilities: signals.missingCapabilities,
+      availableCapabilities: signals.availableCapabilities,
+      reasons: signals.reasons,
+      recommendations: _customRecommendations(signals, riskLevel),
+      userMessage: _customUserMessage(taskName, riskLevel, signals),
+      developerMessage: _customDeveloperMessage(taskName, riskLevel, signals),
       analyzedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
+  }
+
+  Future<void> _evaluateCustomCameraRequirement(
+    _CustomTaskSignals signals,
+  ) async {
+    const String capability = 'camera capability';
+    signals.addRequiredCapability(capability);
+
+    final List<CameraCapability> cameras = await getCameraCapabilities();
+    if (cameras.isEmpty) {
+      signals.addMissingCapability(capability);
+      signals.addHardFailure('Camera capability is required but unavailable.');
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo('Camera capability is available.');
+  }
+
+  Future<void> _evaluateCustomStableNetworkRequirement(
+    _CustomTaskSignals signals,
+  ) async {
+    const String capability = 'stable network';
+    signals.addRequiredCapability(capability);
+
+    final NetworkCapability networkCapability = await getNetworkCapability();
+    if (!networkCapability.isConnected) {
+      signals.addMissingCapability(capability);
+      signals.addHardFailure('Stable network is required but disconnected.');
+      return;
+    }
+
+    if (!networkCapability.isValidated) {
+      signals.addMissingCapability('validated network');
+      signals.addHardFailure(
+        'Stable network is required but internet access is not validated.',
+      );
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo('Stable network is available.');
+  }
+
+  Future<void> _evaluateCustomBatteryRequirement(
+    int minBatteryLevel,
+    _CustomTaskSignals signals,
+  ) async {
+    final String capability = 'battery level >= $minBatteryLevel%';
+    signals.addRequiredCapability(capability);
+
+    final PowerState powerState = await getPowerState();
+    if (powerState.batteryLevel < minBatteryLevel) {
+      signals.addMissingCapability(capability);
+      if (powerState.batteryLevel < 10) {
+        signals.addSoftHighRisk(
+          'Battery is ${powerState.batteryLevel}%, below the required $minBatteryLevel%.',
+        );
+      } else {
+        signals.addSoftMediumRisk(
+          'Battery is ${powerState.batteryLevel}%, below the required $minBatteryLevel%.',
+        );
+      }
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo(
+      'Battery level is ${powerState.batteryLevel}%, meeting the required $minBatteryLevel%.',
+    );
+  }
+
+  void _evaluateCustomSensorRequirement(
+    String requiredSensor,
+    List<NativeSensor> sensors,
+    _CustomTaskSignals signals,
+  ) {
+    final _CustomSensorRequirement? sensorRequirement =
+        _customSensorRequirementFor(requiredSensor);
+    final String capability =
+        sensorRequirement?.capability ?? '${requiredSensor.trim()} sensor';
+
+    signals.addRequiredCapability(capability);
+
+    if (sensorRequirement == null) {
+      signals.addMissingCapability(capability);
+      signals.addHardFailure(
+        'Required sensor "$requiredSensor" is not supported by the custom rule engine yet.',
+      );
+      return;
+    }
+
+    if (_hasSensor(
+      sensors,
+      androidTypes: sensorRequirement.androidTypes,
+      nameMatches: sensorRequirement.nameMatches,
+    )) {
+      signals.addAvailableCapability(capability);
+      signals.addInfo('${sensorRequirement.label} is available.');
+      return;
+    }
+
+    signals.addMissingCapability(capability);
+    signals.addHardFailure(
+      '${sensorRequirement.label} is required but unavailable.',
+    );
+  }
+
+  _CustomSensorRequirement? _customSensorRequirementFor(String sensorName) {
+    final String normalized = sensorName.trim().toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
+
+    switch (normalized) {
+      case 'gyroscope':
+      case 'gyro':
+        return const _CustomSensorRequirement(
+          label: 'Gyroscope sensor',
+          capability: 'gyroscope sensor',
+          androidTypes: <int>[4, 16],
+          nameMatches: <String>['gyroscope', 'gyro'],
+        );
+      case 'accelerometer':
+        return const _CustomSensorRequirement(
+          label: 'Accelerometer sensor',
+          capability: 'accelerometer sensor',
+          androidTypes: <int>[1],
+          nameMatches: <String>['accelerometer'],
+        );
+      case 'magnetometer':
+      case 'compass':
+        return const _CustomSensorRequirement(
+          label: 'Magnetometer or compass sensor',
+          capability: 'magnetometer or compass sensor',
+          androidTypes: <int>[2],
+          nameMatches: <String>['magnetometer', 'magnetic', 'compass'],
+        );
+      case 'stepcounter':
+      case 'stepdetector':
+        return const _CustomSensorRequirement(
+          label: 'Step counter sensor',
+          capability: 'step counter sensor',
+          androidTypes: <int>[18, 19],
+          nameMatches: <String>['step counter', 'step detector'],
+        );
+    }
+
+    return null;
+  }
+
+  String _customRiskLevelForSignals(_CustomTaskSignals signals) {
+    if (signals.hardFailureCount > 0 || signals.softHighRiskCount > 0) {
+      return 'high';
+    }
+
+    if (signals.softMediumRiskCount > 0) {
+      return 'medium';
+    }
+
+    return 'low';
+  }
+
+  String _customSeverityForRiskLevel(String riskLevel) {
+    if (riskLevel == 'high') {
+      return 'critical';
+    }
+
+    if (riskLevel == 'medium') {
+      return 'warning';
+    }
+
+    return 'info';
+  }
+
+  List<String> _customRecommendations(
+    _CustomTaskSignals signals,
+    String riskLevel,
+  ) {
+    if (riskLevel == 'low') {
+      return <String>['Continue with the custom task.'];
+    }
+
+    final List<String> recommendations = <String>[];
+    if (signals.hardFailureCount > 0) {
+      recommendations.add(
+        'Disable this task or provide a fallback until missing capabilities are available.',
+      );
+    }
+
+    if (signals.softHighRiskCount > 0 || signals.softMediumRiskCount > 0) {
+      recommendations.add(
+        'Consider delaying heavy work until battery conditions improve.',
+      );
+    }
+
+    return recommendations;
+  }
+
+  String _customUserMessage(
+    String taskName,
+    String riskLevel,
+    _CustomTaskSignals signals,
+  ) {
+    if (riskLevel == 'low') {
+      return '$taskName looks ready on this device.';
+    }
+
+    if (signals.hardFailureCount > 0) {
+      return '$taskName cannot continue because required device capabilities are missing.';
+    }
+
+    return '$taskName may work, but device conditions are not ideal.';
+  }
+
+  String _customDeveloperMessage(
+    String taskName,
+    String riskLevel,
+    _CustomTaskSignals signals,
+  ) {
+    return 'Custom task "$taskName" analyzed with riskLevel=$riskLevel, '
+        'hardFailures=${signals.hardFailureCount}, '
+        'softHighRisks=${signals.softHighRiskCount}, '
+        'softMediumRisks=${signals.softMediumRiskCount}.';
   }
 
   /// Emits native Android network capability updates as the active network changes.
@@ -1083,4 +1334,65 @@ class _TaskRiskSignals {
       values.add(value);
     }
   }
+}
+
+class _CustomTaskSignals {
+  final List<String> reasons = <String>[];
+  final List<String> requiredCapabilities = <String>[];
+  final List<String> missingCapabilities = <String>[];
+  final List<String> availableCapabilities = <String>[];
+  int hardFailureCount = 0;
+  int softHighRiskCount = 0;
+  int softMediumRiskCount = 0;
+
+  void addHardFailure(String reason) {
+    _addUnique(reasons, reason);
+    hardFailureCount += 1;
+  }
+
+  void addSoftHighRisk(String reason) {
+    _addUnique(reasons, reason);
+    softHighRiskCount += 1;
+  }
+
+  void addSoftMediumRisk(String reason) {
+    _addUnique(reasons, reason);
+    softMediumRiskCount += 1;
+  }
+
+  void addInfo(String reason) {
+    _addUnique(reasons, reason);
+  }
+
+  void addRequiredCapability(String capability) {
+    _addUnique(requiredCapabilities, capability);
+  }
+
+  void addMissingCapability(String capability) {
+    _addUnique(missingCapabilities, capability);
+  }
+
+  void addAvailableCapability(String capability) {
+    _addUnique(availableCapabilities, capability);
+  }
+
+  void _addUnique(List<String> values, String value) {
+    if (!values.contains(value)) {
+      values.add(value);
+    }
+  }
+}
+
+class _CustomSensorRequirement {
+  const _CustomSensorRequirement({
+    required this.label,
+    required this.capability,
+    required this.androidTypes,
+    required this.nameMatches,
+  });
+
+  final String label;
+  final String capability;
+  final List<int> androidTypes;
+  final List<String> nameMatches;
 }
