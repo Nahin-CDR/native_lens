@@ -42,8 +42,8 @@ flutter pub get
 
 ## Native Splash Setup Preview
 
-NativeLens includes an early setup command for planning native splash screen
-configuration:
+NativeLens includes an early setup command for native splash screen
+configuration. Start with a dry run:
 
 ```sh
 dart run native_lens:splash --dry-run
@@ -60,9 +60,24 @@ native_lens:
     ios: true
 ```
 
-The current command validates the config, checks that the splash image exists,
-detects Android and iOS project folders, and prints the native files that a
-future generator would update. It does not modify Android or iOS files yet.
+The dry run validates the config, checks that the splash image exists, detects
+Android and iOS project folders, and prints the native files that would be
+created, modified, or backed up.
+
+Android generation is available now:
+
+```sh
+dart run native_lens:splash --android
+```
+
+Before Android files are changed, NativeLens creates a backup under:
+
+```text
+.native_lens_backup/splash/<timestamp>/
+```
+
+If Android generation fails mid-run, NativeLens restores the files from the
+current backup automatically. iOS generation is not implemented yet.
 
 ## Platform Support
 

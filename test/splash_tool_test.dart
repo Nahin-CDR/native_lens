@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -133,11 +134,15 @@ native_lens:
     expect(plan.platforms.android, isTrue);
     expect(plan.platforms.ios, isFalse);
     expect(
-      plan.plannedFiles,
+      plan.plannedFiles.map(
+        (NativeLensSplashFilePlan file) => file.relativePath,
+      ),
       contains('android/app/src/main/res/values/styles.xml'),
     );
     expect(
-      plan.plannedFiles,
+      plan.plannedFiles.map(
+        (NativeLensSplashFilePlan file) => file.relativePath,
+      ),
       isNot(contains('ios/Runner/Base.lproj/LaunchScreen.storyboard')),
     );
   });
@@ -181,6 +186,210 @@ native_lens:
       );
     },
   );
+
+  test('Android file plan includes generated files and backup intent', () {
+    _writeProject(
+      tempDirectory,
+      pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: true
+    ios: false
+''',
+    );
+    _writeAndroidProject(tempDirectory);
+
+    final NativeLensSplashPlan plan = buildSplashPlan(
+      workingDirectory: tempDirectory,
+    );
+
+    final List<String> paths = plan.plannedFiles
+        .map((NativeLensSplashFilePlan file) => file.relativePath)
+        .toList();
+
+    expect(paths, contains('android/app/src/main/res/values/colors.xml'));
+    expect(paths, contains('android/app/src/main/res/values-v31/styles.xml'));
+    expect(
+      paths,
+      contains('android/app/src/main/res/drawable/native_lens_splash.png'),
+    );
+    expect(
+      plan.plannedFiles.every(
+        (NativeLensSplashFilePlan file) => file.willBackup,
+      ),
+      isTrue,
+    );
+  });
+
+  test('dry-run does not write Android files or backup folders', () async {
+    _writeProject(
+      tempDirectory,
+      pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: true
+    ios: false
+''',
+    );
+    _writeAndroidProject(tempDirectory);
+
+    final int exitCode = await runNativeLensSplash(
+      <String>['--dry-run'],
+      workingDirectory: tempDirectory,
+      stdoutWriter: (_) {},
+      stderrWriter: (_) {},
+    );
+
+    expect(exitCode, 0);
+    expect(
+      File(
+        [
+          tempDirectory.path,
+          'android',
+          'app',
+          'src',
+          'main',
+          'res',
+          'values-v31',
+          'styles.xml',
+        ].join(Platform.pathSeparator),
+      ).existsSync(),
+      isFalse,
+    );
+    expect(
+      Directory(
+        [
+          tempDirectory.path,
+          '.native_lens_backup',
+          'splash',
+        ].join(Platform.pathSeparator),
+      ).existsSync(),
+      isFalse,
+    );
+  });
+
+  test('Android generation creates backup manifest and XML files', () {
+    _writeProject(
+      tempDirectory,
+      pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: true
+    ios: false
+''',
+    );
+    _writeAndroidProject(tempDirectory);
+
+    final NativeLensSplashPlan plan = buildSplashPlan(
+      workingDirectory: tempDirectory,
+    );
+    final NativeLensSplashGenerationResult result = generateAndroidSplash(
+      plan,
+      timestamp: '20260526_120000_000',
+    );
+
+    expect(File(result.manifestPath).existsSync(), isTrue);
+    final Map<String, Object?> manifest =
+        jsonDecode(File(result.manifestPath).readAsStringSync())
+            as Map<String, Object?>;
+    expect(manifest['tool'], 'native_lens:splash');
+    expect(
+      result.generatedFiles,
+      contains('android/app/src/main/res/values/colors.xml'),
+    );
+
+    final String colorsXml = _readProjectFile(
+      tempDirectory,
+      'android/app/src/main/res/values/colors.xml',
+    );
+    expect(colorsXml, contains('native_lens_splash_background'));
+    expect(colorsXml, contains('#0B1020'));
+
+    final String launchBackground = _readProjectFile(
+      tempDirectory,
+      'android/app/src/main/res/drawable/launch_background.xml',
+    );
+    expect(launchBackground, contains('@drawable/native_lens_splash'));
+
+    final String stylesXml = _readProjectFile(
+      tempDirectory,
+      'android/app/src/main/res/values/styles.xml',
+    );
+    expect(stylesXml, contains('name="NormalTheme"'));
+    expect(stylesXml, contains('@drawable/launch_background'));
+
+    final String v31Styles = _readProjectFile(
+      tempDirectory,
+      'android/app/src/main/res/values-v31/styles.xml',
+    );
+    expect(v31Styles, contains('windowSplashScreenBackground'));
+    expect(v31Styles, contains('windowSplashScreenAnimatedIcon'));
+  });
+
+  test('Android generation rolls back when a write fails', () {
+    _writeProject(
+      tempDirectory,
+      pubspec: '''
+name: demo_app
+native_lens:
+  splash:
+    background_color: "#0B1020"
+    image: assets/splash/logo.png
+    android: true
+    ios: false
+''',
+    );
+    _writeAndroidProject(tempDirectory);
+
+    final String originalColorsXml = _readProjectFile(
+      tempDirectory,
+      'android/app/src/main/res/values/colors.xml',
+    );
+    final NativeLensSplashPlan plan = buildSplashPlan(
+      workingDirectory: tempDirectory,
+    );
+
+    expect(
+      () => generateAndroidSplash(
+        plan,
+        timestamp: '20260526_120000_001',
+        simulateFailureAfterFirstWrite: true,
+      ),
+      throwsA(isA<NativeLensSplashException>()),
+    );
+
+    expect(
+      _readProjectFile(
+        tempDirectory,
+        'android/app/src/main/res/values/colors.xml',
+      ),
+      originalColorsXml,
+    );
+    expect(
+      File(
+        [
+          tempDirectory.path,
+          'android',
+          'app',
+          'src',
+          'main',
+          'res',
+          'values-v31',
+          'styles.xml',
+        ].join(Platform.pathSeparator),
+      ).existsSync(),
+      isFalse,
+    );
+  });
 }
 
 void _writeProject(
@@ -211,4 +420,91 @@ void _writeProject(
       ..createSync(recursive: true)
       ..writeAsBytesSync(<int>[0, 1, 2, 3]);
   }
+}
+
+void _writeAndroidProject(Directory directory) {
+  File(
+      [
+        directory.path,
+        'android',
+        'app',
+        'src',
+        'main',
+        'AndroidManifest.xml',
+      ].join(Platform.pathSeparator),
+    )
+    ..createSync(recursive: true)
+    ..writeAsStringSync('''
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name=".MainActivity" android:theme="@style/LaunchTheme" />
+    </application>
+</manifest>
+''');
+
+  File(
+      [
+        directory.path,
+        'android',
+        'app',
+        'src',
+        'main',
+        'res',
+        'values',
+        'colors.xml',
+      ].join(Platform.pathSeparator),
+    )
+    ..createSync(recursive: true)
+    ..writeAsStringSync('''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="existing_color">#FFFFFF</color>
+</resources>
+''');
+
+  File(
+      [
+        directory.path,
+        'android',
+        'app',
+        'src',
+        'main',
+        'res',
+        'values',
+        'styles.xml',
+      ].join(Platform.pathSeparator),
+    )
+    ..createSync(recursive: true)
+    ..writeAsStringSync('''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/old_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>
+''');
+
+  File(
+      [
+        directory.path,
+        'android',
+        'app',
+        'src',
+        'main',
+        'res',
+        'drawable',
+        'launch_background.xml',
+      ].join(Platform.pathSeparator),
+    )
+    ..createSync(recursive: true)
+    ..writeAsStringSync('<layer-list />');
+}
+
+String _readProjectFile(Directory directory, String relativePath) {
+  return File(
+    [directory.path, ...relativePath.split('/')].join(Platform.pathSeparator),
+  ).readAsStringSync();
 }

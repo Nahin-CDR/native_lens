@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
@@ -47,6 +48,7 @@ class NativeLensSplashPlan {
     required this.androidProjectPath,
     required this.iosProjectPath,
     required this.plannedFiles,
+    required this.warnings,
   });
 
   final String projectRoot;
@@ -55,10 +57,74 @@ class NativeLensSplashPlan {
   final NativeLensSplashPlatformSelection platforms;
   final String? androidProjectPath;
   final String? iosProjectPath;
-  final List<String> plannedFiles;
+  final List<NativeLensSplashFilePlan> plannedFiles;
+  final List<String> warnings;
+}
+
+class NativeLensSplashFilePlan {
+  const NativeLensSplashFilePlan({
+    required this.relativePath,
+    required this.action,
+    required this.willBackup,
+  });
+
+  final String relativePath;
+  final String action;
+  final bool willBackup;
+}
+
+class NativeLensSplashGenerationResult {
+  const NativeLensSplashGenerationResult({
+    required this.backupDirectory,
+    required this.manifestPath,
+    required this.generatedFiles,
+    required this.restoredAfterFailure,
+    required this.warnings,
+  });
+
+  final String backupDirectory;
+  final String manifestPath;
+  final List<String> generatedFiles;
+  final bool restoredAfterFailure;
+  final List<String> warnings;
+}
+
+class NativeLensSplashBackupEntry {
+  const NativeLensSplashBackupEntry({
+    required this.relativePath,
+    required this.existed,
+    required this.backupRelativePath,
+  });
+
+  final String relativePath;
+  final bool existed;
+  final String? backupRelativePath;
+
+  Map<String, Object?> toJson() {
+    return <String, Object?>{
+      'relativePath': relativePath,
+      'existed': existed,
+      'backupRelativePath': backupRelativePath,
+    };
+  }
 }
 
 typedef StdoutWriter = void Function(String message);
+
+const List<String> androidGeneratedRelativePaths = <String>[
+  'android/app/src/main/res/values/colors.xml',
+  'android/app/src/main/res/values/styles.xml',
+  'android/app/src/main/res/values-v31/styles.xml',
+  'android/app/src/main/res/drawable/launch_background.xml',
+  'android/app/src/main/res/drawable-v21/launch_background.xml',
+  'android/app/src/main/res/drawable/native_lens_splash.png',
+];
+
+const List<String> iosPlannedRelativePaths = <String>[
+  'ios/Runner/Base.lproj/LaunchScreen.storyboard',
+  'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/Contents.json',
+  'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/splash.png',
+];
 
 Future<int> runNativeLensSplash(
   List<String> arguments, {
@@ -84,12 +150,31 @@ Future<int> runNativeLensSplash(
       iosOnly: results['ios'] as bool,
     );
 
-    out(formatSplashPlan(plan, dryRun: results['dry-run'] as bool));
+    final bool dryRun = results['dry-run'] as bool;
+    out(formatSplashPlan(plan, dryRun: dryRun));
 
-    if (!(results['dry-run'] as bool)) {
+    if (!dryRun) {
       out('');
-      out('Native splash generation is not implemented in this preview.');
-      out('No Android or iOS files were modified.');
+      if (plan.platforms.android) {
+        final NativeLensSplashGenerationResult result = generateAndroidSplash(
+          plan,
+        );
+        out('Android native splash files generated.');
+        out('Backup: ${result.backupDirectory}');
+        out('Manifest: ${result.manifestPath}');
+        out('Generated files:');
+        for (final String file in result.generatedFiles) {
+          out('  - $file');
+        }
+        for (final String warning in result.warnings) {
+          out('Warning: $warning');
+        }
+      }
+
+      if (plan.platforms.ios) {
+        out('iOS splash generation is not implemented yet.');
+        out('No iOS files were modified.');
+      }
     }
 
     return 0;
@@ -162,7 +247,16 @@ NativeLensSplashPlan buildSplashPlan({
       ? detectIosProjectPath(projectRoot)
       : null;
 
-  final List<String> plannedFiles = buildPlannedFiles(platforms: platforms);
+  final List<NativeLensSplashFilePlan> plannedFiles = buildPlannedFiles(
+    platforms: platforms,
+    projectRoot: projectRoot,
+  );
+  final List<String> warnings = buildPlanWarnings(
+    platforms: platforms,
+    projectRoot: projectRoot,
+    androidProjectPath: androidProjectPath,
+    iosProjectPath: iosProjectPath,
+  );
 
   return NativeLensSplashPlan(
     projectRoot: projectRoot.path,
@@ -172,6 +266,7 @@ NativeLensSplashPlan buildSplashPlan({
     androidProjectPath: androidProjectPath,
     iosProjectPath: iosProjectPath,
     plannedFiles: plannedFiles,
+    warnings: warnings,
   );
 }
 
@@ -288,31 +383,466 @@ String? detectIosProjectPath(Directory projectRoot) {
   return iosDirectory.existsSync() ? iosDirectory.path : null;
 }
 
-List<String> buildPlannedFiles({
+List<NativeLensSplashFilePlan> buildPlannedFiles({
   required NativeLensSplashPlatformSelection platforms,
+  required Directory projectRoot,
 }) {
-  final List<String> files = <String>[];
+  final List<NativeLensSplashFilePlan> files = <NativeLensSplashFilePlan>[];
 
   if (platforms.android) {
-    files.addAll(<String>[
-      'android/app/src/main/res/values/colors.xml',
-      'android/app/src/main/res/values/styles.xml',
-      'android/app/src/main/res/values-v31/styles.xml',
-      'android/app/src/main/res/drawable/launch_background.xml',
-      'android/app/src/main/res/drawable-v21/launch_background.xml',
-      'android/app/src/main/AndroidManifest.xml',
-    ]);
+    for (final String relativePath in androidGeneratedRelativePaths) {
+      files.add(
+        NativeLensSplashFilePlan(
+          relativePath: relativePath,
+          action: File(_join(projectRoot.path, relativePath)).existsSync()
+              ? 'modify'
+              : 'create',
+          willBackup: true,
+        ),
+      );
+    }
   }
 
   if (platforms.ios) {
-    files.addAll(<String>[
-      'ios/Runner/Base.lproj/LaunchScreen.storyboard',
-      'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/Contents.json',
-      'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/splash.png',
-    ]);
+    for (final String relativePath in iosPlannedRelativePaths) {
+      files.add(
+        NativeLensSplashFilePlan(
+          relativePath: relativePath,
+          action: 'planned',
+          willBackup: false,
+        ),
+      );
+    }
   }
 
   return files;
+}
+
+List<String> buildPlanWarnings({
+  required NativeLensSplashPlatformSelection platforms,
+  required Directory projectRoot,
+  required String? androidProjectPath,
+  required String? iosProjectPath,
+}) {
+  final List<String> warnings = <String>[];
+
+  if (platforms.android) {
+    if (androidProjectPath == null) {
+      warnings.add('Android project folder was not found.');
+    } else if (!Directory(
+      _join(projectRoot.path, 'android', 'app'),
+    ).existsSync()) {
+      warnings.add('Android app module was not found at android/app.');
+    }
+
+    final File manifestFile = File(
+      _join(
+        projectRoot.path,
+        'android',
+        'app',
+        'src',
+        'main',
+        'AndroidManifest.xml',
+      ),
+    );
+    if (!manifestFile.existsSync()) {
+      warnings.add(
+        'AndroidManifest.xml was not found for LaunchTheme verification.',
+      );
+    } else if (!manifestFile.readAsStringSync().contains(
+      '@style/LaunchTheme',
+    )) {
+      warnings.add(
+        'AndroidManifest.xml does not appear to use @style/LaunchTheme.',
+      );
+    }
+  }
+
+  if (platforms.ios && iosProjectPath == null) {
+    warnings.add('iOS project folder was not found.');
+  }
+
+  return warnings;
+}
+
+NativeLensSplashGenerationResult generateAndroidSplash(
+  NativeLensSplashPlan plan, {
+  String? timestamp,
+  bool simulateFailureAfterFirstWrite = false,
+}) {
+  if (!plan.platforms.android) {
+    throw const NativeLensSplashException('Android splash is not selected.');
+  }
+
+  final Directory projectRoot = Directory(plan.projectRoot);
+  final Directory androidAppDirectory = Directory(
+    _join(projectRoot.path, 'android', 'app'),
+  );
+  if (!androidAppDirectory.existsSync()) {
+    throw const NativeLensSplashException(
+      'Android app module was not found at android/app.',
+    );
+  }
+
+  final List<NativeLensSplashFilePlan> androidFiles = plan.plannedFiles
+      .where(
+        (NativeLensSplashFilePlan file) =>
+            androidGeneratedRelativePaths.contains(file.relativePath),
+      )
+      .toList(growable: false);
+
+  final Directory backupDirectory = createBackupDirectory(
+    projectRoot,
+    timestamp: timestamp,
+  );
+  final List<NativeLensSplashBackupEntry> backupEntries = backupAndroidFiles(
+    projectRoot: projectRoot,
+    backupDirectory: backupDirectory,
+    files: androidFiles,
+  );
+
+  final File manifestFile = File(_join(backupDirectory.path, 'manifest.json'));
+  writeBackupManifest(
+    manifestFile: manifestFile,
+    projectRoot: projectRoot,
+    backupDirectory: backupDirectory,
+    entries: backupEntries,
+  );
+
+  final Map<String, List<int>> binaryWrites = <String, List<int>>{
+    'android/app/src/main/res/drawable/native_lens_splash.png': File(
+      _join(projectRoot.path, plan.config.imagePath),
+    ).readAsBytesSync(),
+  };
+
+  final Map<String, String> textWrites = <String, String>{
+    'android/app/src/main/res/values/colors.xml': buildAndroidColorsXml(
+      existingXml: _readOptionalFile(
+        projectRoot,
+        'android/app/src/main/res/values/colors.xml',
+      ),
+      backgroundColor: plan.config.backgroundColor,
+    ),
+    'android/app/src/main/res/values/styles.xml': buildAndroidStylesXml(
+      existingXml: _readOptionalFile(
+        projectRoot,
+        'android/app/src/main/res/values/styles.xml',
+      ),
+    ),
+    'android/app/src/main/res/values-v31/styles.xml':
+        buildAndroidV31StylesXml(),
+    'android/app/src/main/res/drawable/launch_background.xml':
+        buildAndroidLaunchBackgroundXml(),
+    'android/app/src/main/res/drawable-v21/launch_background.xml':
+        buildAndroidLaunchBackgroundXml(),
+  };
+
+  final List<String> generatedFiles = <String>[];
+  try {
+    var writeCount = 0;
+
+    for (final MapEntry<String, String> entry in textWrites.entries) {
+      _writeTextFile(projectRoot, entry.key, entry.value);
+      generatedFiles.add(entry.key);
+      writeCount += 1;
+      if (simulateFailureAfterFirstWrite && writeCount == 1) {
+        throw const NativeLensSplashException(
+          'Simulated Android splash generation failure.',
+        );
+      }
+    }
+
+    for (final MapEntry<String, List<int>> entry in binaryWrites.entries) {
+      _writeBinaryFile(projectRoot, entry.key, entry.value);
+      generatedFiles.add(entry.key);
+    }
+  } catch (error) {
+    restoreBackup(
+      projectRoot: projectRoot,
+      backupDirectory: backupDirectory,
+      entries: backupEntries,
+    );
+    throw NativeLensSplashException(
+      'Android splash generation failed and rollback was completed: $error',
+    );
+  }
+
+  return NativeLensSplashGenerationResult(
+    backupDirectory: backupDirectory.path,
+    manifestPath: manifestFile.path,
+    generatedFiles: generatedFiles,
+    restoredAfterFailure: false,
+    warnings: plan.warnings,
+  );
+}
+
+Directory createBackupDirectory(Directory projectRoot, {String? timestamp}) {
+  final String baseTimestamp = timestamp ?? _timestamp();
+  final Directory backupRoot = Directory(
+    _join(projectRoot.path, '.native_lens_backup', 'splash'),
+  );
+
+  var suffix = 0;
+  while (true) {
+    final String directoryName = suffix == 0
+        ? baseTimestamp
+        : '${baseTimestamp}_$suffix';
+    final Directory candidate = Directory(
+      _join(backupRoot.path, directoryName),
+    );
+    if (!candidate.existsSync()) {
+      candidate.createSync(recursive: true);
+      return candidate;
+    }
+    suffix += 1;
+  }
+}
+
+List<NativeLensSplashBackupEntry> backupAndroidFiles({
+  required Directory projectRoot,
+  required Directory backupDirectory,
+  required List<NativeLensSplashFilePlan> files,
+}) {
+  final List<NativeLensSplashBackupEntry> entries =
+      <NativeLensSplashBackupEntry>[];
+
+  for (final NativeLensSplashFilePlan filePlan in files) {
+    final File source = File(_join(projectRoot.path, filePlan.relativePath));
+    if (source.existsSync()) {
+      final File backupFile = File(
+        _join(backupDirectory.path, filePlan.relativePath),
+      );
+      backupFile.parent.createSync(recursive: true);
+      source.copySync(backupFile.path);
+      entries.add(
+        NativeLensSplashBackupEntry(
+          relativePath: filePlan.relativePath,
+          existed: true,
+          backupRelativePath: filePlan.relativePath,
+        ),
+      );
+    } else {
+      entries.add(
+        NativeLensSplashBackupEntry(
+          relativePath: filePlan.relativePath,
+          existed: false,
+          backupRelativePath: null,
+        ),
+      );
+    }
+  }
+
+  return entries;
+}
+
+void writeBackupManifest({
+  required File manifestFile,
+  required Directory projectRoot,
+  required Directory backupDirectory,
+  required List<NativeLensSplashBackupEntry> entries,
+}) {
+  manifestFile.writeAsStringSync(
+    const JsonEncoder.withIndent('  ').convert(<String, Object?>{
+      'tool': 'native_lens:splash',
+      'phase': 'android',
+      'projectRoot': projectRoot.path,
+      'backupDirectory': backupDirectory.path,
+      'files': entries
+          .map((NativeLensSplashBackupEntry entry) => entry.toJson())
+          .toList(growable: false),
+    }),
+  );
+}
+
+void restoreBackup({
+  required Directory projectRoot,
+  required Directory backupDirectory,
+  required List<NativeLensSplashBackupEntry> entries,
+}) {
+  for (final NativeLensSplashBackupEntry entry in entries) {
+    final File target = File(_join(projectRoot.path, entry.relativePath));
+    if (entry.existed) {
+      final File backupFile = File(
+        _join(backupDirectory.path, entry.backupRelativePath!),
+      );
+      target.parent.createSync(recursive: true);
+      backupFile.copySync(target.path);
+    } else if (target.existsSync()) {
+      target.deleteSync();
+    }
+  }
+}
+
+String buildAndroidColorsXml({
+  required String? existingXml,
+  required String backgroundColor,
+}) {
+  const String colorName = 'native_lens_splash_background';
+  final String colorElement =
+      '    <color name="$colorName">$backgroundColor</color>';
+
+  if (existingXml == null || existingXml.trim().isEmpty) {
+    return '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+$colorElement
+</resources>
+''';
+  }
+
+  final RegExp existingColor = RegExp(
+    r'\s*<color\s+name="native_lens_splash_background">[^<]*</color>',
+  );
+  if (existingColor.hasMatch(existingXml)) {
+    return existingXml.replaceFirst(existingColor, '\n$colorElement');
+  }
+
+  if (existingXml.contains('</resources>')) {
+    return existingXml.replaceFirst(
+      '</resources>',
+      '$colorElement\n</resources>',
+    );
+  }
+
+  return '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+$colorElement
+</resources>
+''';
+}
+
+String buildAndroidStylesXml({required String? existingXml}) {
+  final String launchTheme = _androidLaunchThemeXml();
+
+  if (existingXml == null || existingXml.trim().isEmpty) {
+    return '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+$launchTheme
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>
+''';
+  }
+
+  final RegExp existingLaunchTheme = RegExp(
+    r'\s*<style\s+name="LaunchTheme"[\s\S]*?</style>',
+    multiLine: true,
+  );
+  if (existingLaunchTheme.hasMatch(existingXml)) {
+    return existingXml.replaceFirst(existingLaunchTheme, '\n$launchTheme');
+  }
+
+  if (existingXml.contains('</resources>')) {
+    return existingXml.replaceFirst(
+      '</resources>',
+      '$launchTheme\n</resources>',
+    );
+  }
+
+  return '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+$launchTheme
+</resources>
+''';
+}
+
+String buildAndroidV31StylesXml() {
+  return '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/native_lens_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/native_lens_splash</item>
+        <item name="android:postSplashScreenTheme">@style/NormalTheme</item>
+    </style>
+</resources>
+''';
+}
+
+String buildAndroidLaunchBackgroundXml() {
+  return '''
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/native_lens_splash_background" />
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/native_lens_splash" />
+    </item>
+</layer-list>
+''';
+}
+
+String _androidLaunchThemeXml() {
+  return '''
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>''';
+}
+
+String? _readOptionalFile(Directory projectRoot, String relativePath) {
+  final File file = File(_join(projectRoot.path, relativePath));
+  if (!file.existsSync()) {
+    return null;
+  }
+
+  return file.readAsStringSync();
+}
+
+void _writeTextFile(
+  Directory projectRoot,
+  String relativePath,
+  String content,
+) {
+  final File file = File(_join(projectRoot.path, relativePath));
+  file.parent.createSync(recursive: true);
+  file.writeAsStringSync(content);
+}
+
+void _writeBinaryFile(
+  Directory projectRoot,
+  String relativePath,
+  List<int> bytes,
+) {
+  final File file = File(_join(projectRoot.path, relativePath));
+  file.parent.createSync(recursive: true);
+  file.writeAsBytesSync(bytes);
+}
+
+String _join(
+  String first,
+  String second, [
+  String? third,
+  String? fourth,
+  String? fifth,
+  String? sixth,
+]) {
+  return <String>[
+    first,
+    second,
+    ?third,
+    ?fourth,
+    ?fifth,
+    ?sixth,
+  ].join(Platform.pathSeparator);
+}
+
+String _timestamp() {
+  final DateTime now = DateTime.now().toUtc();
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  String threeDigits(int value) => value.toString().padLeft(3, '0');
+
+  return '${now.year}'
+      '${twoDigits(now.month)}'
+      '${twoDigits(now.day)}_'
+      '${twoDigits(now.hour)}'
+      '${twoDigits(now.minute)}'
+      '${twoDigits(now.second)}_'
+      '${threeDigits(now.millisecond)}';
 }
 
 String formatSplashPlan(NativeLensSplashPlan plan, {required bool dryRun}) {
@@ -341,12 +871,28 @@ String formatSplashPlan(NativeLensSplashPlan plan, {required bool dryRun}) {
     'Files that would be modified later:',
   ];
 
-  for (final String file in plan.plannedFiles) {
-    lines.add('  - $file');
+  for (final NativeLensSplashFilePlan file in plan.plannedFiles) {
+    lines.add(
+      '  - ${file.relativePath} (${file.action}, '
+      '${file.willBackup ? 'backup enabled' : 'no backup yet'})',
+    );
+  }
+
+  if (plan.warnings.isNotEmpty) {
+    lines.add('');
+    lines.add('Warnings:');
+    for (final String warning in plan.warnings) {
+      lines.add('  - $warning');
+    }
   }
 
   lines.add('');
-  lines.add('No Android or iOS files were modified.');
+  if (dryRun) {
+    lines.add('No Android or iOS files were modified.');
+  } else {
+    lines.add('Selected Android files will be generated after this preview.');
+    lines.add('iOS files are not generated in this phase.');
+  }
 
   return lines.join('\n');
 }

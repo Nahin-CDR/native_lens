@@ -2,7 +2,8 @@
 
 - Added initial `dart run native_lens:splash` CLI preview for native splash setup.
 - Added native splash config parsing, validation, and dry-run planning.
-- No Android or iOS splash file generation is enabled yet.
+- Added Android native splash generation with automatic backups and rollback.
+- iOS splash generation is still planned for a later phase.
 
 ## 0.6.0
 
