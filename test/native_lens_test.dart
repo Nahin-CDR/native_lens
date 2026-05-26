@@ -405,6 +405,25 @@ class MockMissingMotionSensorsPlatform extends MockNativeLensPlatform {
   }
 }
 
+class MockMicrophonePlatform extends MockNativeLensPlatform {
+  @override
+  Future<List<SystemFeature>> getSystemFeatures() {
+    return Future<List<SystemFeature>>.value(const <SystemFeature>[
+      SystemFeature(
+        name: 'android.hardware.touchscreen',
+        version: null,
+        isGlEsFeature: false,
+      ),
+      SystemFeature(
+        name: 'android.hardware.microphone',
+        version: null,
+        isGlEsFeature: false,
+      ),
+      SystemFeature(name: 'OpenGL ES', version: 196608, isGlEsFeature: true),
+    ]);
+  }
+}
+
 void main() {
   final NativeLensPlatform initialPlatform = NativeLensPlatform.instance;
 
@@ -957,6 +976,110 @@ void main() {
       expect(result.userMessage, contains('may work'));
     },
   );
+
+  test(
+    'analyzeCustomTask returns high risk when microphone is missing',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'Voice Capture',
+            requirements: const NativeLensTaskRequirements(
+              requiresMicrophone: true,
+            ),
+          );
+
+      expect(result.riskLevel, 'high');
+      expect(result.severity, 'critical');
+      expect(result.canContinue, isFalse);
+      expect(result.requiredCapabilities, contains('microphone capability'));
+      expect(result.missingCapabilities, contains('microphone capability'));
+      expect(
+        result.reasons,
+        contains('Microphone capability is required but unavailable.'),
+      );
+      expect(result.recommendations, isNotEmpty);
+    },
+  );
+
+  test('analyzeCustomTask reports available microphone capability', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockMicrophonePlatform fakePlatform = MockMicrophonePlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Voice Capture',
+          requirements: const NativeLensTaskRequirements(
+            requiresMicrophone: true,
+          ),
+        );
+
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('microphone capability'));
+    expect(result.availableCapabilities, contains('microphone capability'));
+    expect(result.missingCapabilities, isEmpty);
+    expect(result.reasons, contains('Microphone capability is available.'));
+  });
+
+  test(
+    'analyzeCustomTask returns high risk when system feature is missing',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      const String featureName = 'android.hardware.location.gps';
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'GPS Navigation',
+            requirements: const NativeLensTaskRequirements(
+              requiredSystemFeatures: <String>[featureName],
+            ),
+          );
+
+      expect(result.riskLevel, 'high');
+      expect(result.severity, 'critical');
+      expect(result.canContinue, isFalse);
+      expect(result.requiredCapabilities, contains(featureName));
+      expect(result.missingCapabilities, contains(featureName));
+      expect(
+        result.reasons,
+        contains('System feature $featureName is required but unavailable.'),
+      );
+    },
+  );
+
+  test('analyzeCustomTask reports available required system feature', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    const String featureName = 'android.hardware.touchscreen';
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Touch Tool',
+          requirements: const NativeLensTaskRequirements(
+            requiredSystemFeatures: <String>[featureName],
+          ),
+        );
+
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains(featureName));
+    expect(result.availableCapabilities, contains(featureName));
+    expect(result.missingCapabilities, isEmpty);
+    expect(
+      result.reasons,
+      contains('System feature $featureName is available.'),
+    );
+  });
 
   test('networkCapabilityStream', () async {
     NativeLens nativeLensPlugin = NativeLens();

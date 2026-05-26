@@ -263,6 +263,24 @@ class NativeLens {
       await _evaluateCustomStableNetworkRequirement(signals);
     }
 
+    if (requirements.requiresMicrophone ||
+        requirements.requiredSystemFeatures.isNotEmpty) {
+      final List<SystemFeature> systemFeatures = await getSystemFeatures();
+
+      if (requirements.requiresMicrophone) {
+        _evaluateCustomMicrophoneRequirement(systemFeatures, signals);
+      }
+
+      for (final String requiredSystemFeature
+          in requirements.requiredSystemFeatures) {
+        _evaluateCustomSystemFeatureRequirement(
+          requiredSystemFeature,
+          systemFeatures,
+          signals,
+        );
+      }
+    }
+
     final int? minBatteryLevel = requirements.minBatteryLevel;
     if (minBatteryLevel != null) {
       await _evaluateCustomBatteryRequirement(minBatteryLevel, signals);
@@ -339,6 +357,48 @@ class NativeLens {
 
     signals.addAvailableCapability(capability);
     signals.addInfo('Stable network is available.');
+  }
+
+  void _evaluateCustomMicrophoneRequirement(
+    List<SystemFeature> systemFeatures,
+    _CustomTaskSignals signals,
+  ) {
+    const String capability = 'microphone capability';
+    signals.addRequiredCapability(capability);
+
+    if (_hasExactSystemFeature(systemFeatures, 'android.hardware.microphone')) {
+      signals.addAvailableCapability(capability);
+      signals.addInfo('Microphone capability is available.');
+      return;
+    }
+
+    signals.addMissingCapability(capability);
+    signals.addHardFailure(
+      'Microphone capability is required but unavailable.',
+    );
+  }
+
+  void _evaluateCustomSystemFeatureRequirement(
+    String requiredSystemFeature,
+    List<SystemFeature> systemFeatures,
+    _CustomTaskSignals signals,
+  ) {
+    if (requiredSystemFeature.isEmpty) {
+      return;
+    }
+
+    signals.addRequiredCapability(requiredSystemFeature);
+
+    if (_hasExactSystemFeature(systemFeatures, requiredSystemFeature)) {
+      signals.addAvailableCapability(requiredSystemFeature);
+      signals.addInfo('System feature $requiredSystemFeature is available.');
+      return;
+    }
+
+    signals.addMissingCapability(requiredSystemFeature);
+    signals.addHardFailure(
+      'System feature $requiredSystemFeature is required but unavailable.',
+    );
   }
 
   Future<void> _evaluateCustomBatteryRequirement(
@@ -1061,6 +1121,15 @@ class NativeLens {
     final String normalizedFeatureName = featureName.toLowerCase();
     return systemFeatures.any((SystemFeature feature) {
       return feature.name.toLowerCase() == normalizedFeatureName;
+    });
+  }
+
+  bool _hasExactSystemFeature(
+    List<SystemFeature> systemFeatures,
+    String featureName,
+  ) {
+    return systemFeatures.any((SystemFeature feature) {
+      return feature.name == featureName;
     });
   }
 
