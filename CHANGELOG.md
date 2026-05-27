@@ -1,3 +1,22 @@
+## 0.9.0 - Unreleased
+
+- Added `NativeLensPreset` enum.
+- Added preset task mappings.
+- Added `analyzePresetTask()`.
+- Added preset feature preflight support.
+- Added presets:
+  - `liveStreaming`
+  - `videoUpload`
+  - `faceFilterCamera`
+  - `cameraRecording`
+  - `backgroundSync`
+  - `arExperience`
+  - `stepTracking`
+  - `compassNavigation`
+  - `mediaProcessing`
+- Added example app preset selector.
+- Added README guide for Preset Feature Preflight.
+
 ## 0.8.1
 
 - Added Articles & Announcements links to README.
