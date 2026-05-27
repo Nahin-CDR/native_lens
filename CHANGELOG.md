@@ -1,4 +1,4 @@
-## 0.8.0 - Unreleased
+## 0.8.0
 
 - Added Custom Task Requirements API.
 - Added `NativeLensTaskRequirements` model.
