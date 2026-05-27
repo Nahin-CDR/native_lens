@@ -273,6 +273,34 @@ an ML model file. NativeLens uses native device signals and explainable
 rule-based intelligence, and it does not claim CPU, GPU, or chip-level
 detection unless reliable platform APIs expose that data.
 
+### Custom Task Requirements
+
+NativeLens can analyze whether a device is ready for a developer-defined custom
+feature or task.
+
+```dart
+final result = await NativeLens().analyzeCustomTask(
+  taskName: 'Face Filter Camera',
+  requirements: const NativeLensTaskRequirements(
+    requiresCamera: true,
+    requiresMicrophone: false,
+    requiresStableNetwork: true,
+    requiredSensors: ['gyroscope', 'accelerometer'],
+    minBatteryLevel: 20,
+  ),
+);
+```
+
+The result includes:
+
+- `riskLevel`
+- `severity`
+- `canContinue`
+- `missingCapabilities`
+- `recommendations`
+- `userMessage`
+- `developerMessage`
+
 ### Dataset Pipeline
 
 Generate a stable dataset row from the current NativeLens report and
@@ -400,7 +428,6 @@ It reads Camera2 metadata only and does not open the camera or capture media.
 
 - Deep Android capability support remains the primary focus.
 - iOS support is currently foundational and safe-fallback oriented.
-- No AI model yet.
 - No macOS, Windows, Linux, or web implementation yet.
 
 ## Author
