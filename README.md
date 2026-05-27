@@ -472,9 +472,6 @@ Want to know why NativeLens was built?
 - 📖 Medium article: NativeLens — A Flutter Package for Device Capability Intelligence Before Your Feature Fails  
   https://medium.com/@nahin.cdr/nativelens-a-flutter-package-for-device-capability-intelligence-before-your-feature-fails-8d7a2c086c91
 
-- 🚀 LinkedIn launch post: NativeLens v0.8.0 is live on pub.dev  
-  https://www.linkedin.com/feed/update/urn:li:activity:7465317116674580481/
-
 ## Repository
 
 - Homepage: https://github.com/Nahin-CDR/native_lens
