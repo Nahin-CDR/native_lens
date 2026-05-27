@@ -896,8 +896,13 @@ void main() {
     expect(result.availableCapabilities, contains('battery level >= 20%'));
     expect(result.reasons, contains('Camera capability is available.'));
     expect(result.recommendations, <String>['Continue with the custom task.']);
-    expect(result.userMessage, contains('Face Filter Camera looks ready'));
+    expect(result.userMessage, 'This feature looks ready on this device.');
     expect(result.developerMessage, contains('riskLevel=low'));
+    expect(result.developerMessage, contains('missingCapabilities=none'));
+    expect(
+      result.developerMessage,
+      contains('Camera capability is available.'),
+    );
     expect(result.analyzedAtMillis, greaterThanOrEqualTo(beforeAnalysis));
   });
 
@@ -921,7 +926,18 @@ void main() {
       result.reasons,
       contains('Camera capability is required but unavailable.'),
     );
-    expect(result.userMessage, contains('cannot continue'));
+    expect(
+      result.userMessage,
+      'This feature may not work properly on this device.',
+    );
+    expect(
+      result.developerMessage,
+      contains('missingCapabilities=camera capability'),
+    );
+    expect(
+      result.developerMessage,
+      contains('Camera capability is required but unavailable.'),
+    );
   });
 
   test(
@@ -1001,7 +1017,10 @@ void main() {
         result.reasons,
         contains('Battery is 8%, below the required 20%.'),
       );
-      expect(result.userMessage, contains('may work'));
+      expect(
+        result.userMessage,
+        'This feature may not work properly on this device.',
+      );
     },
   );
 
@@ -1186,6 +1205,18 @@ void main() {
       expect(
         result.recommendations,
         contains('Use H.264 fallback when HEVC is unavailable.'),
+      );
+      expect(
+        result.userMessage,
+        'This feature may work better with a few device or network improvements.',
+      );
+      expect(
+        result.developerMessage,
+        contains('missingCapabilities=HEVC encoder'),
+      );
+      expect(
+        result.developerMessage,
+        contains('HEVC encoder is unavailable; use H.264 fallback.'),
       );
     },
   );

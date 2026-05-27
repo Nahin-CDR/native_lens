@@ -351,7 +351,7 @@ class NativeLens {
       availableCapabilities: signals.availableCapabilities,
       reasons: signals.reasons,
       recommendations: _customRecommendations(signals, riskLevel),
-      userMessage: _customUserMessage(taskName, riskLevel, signals),
+      userMessage: _customUserMessage(riskLevel),
       developerMessage: _customDeveloperMessage(taskName, riskLevel, signals),
       analyzedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
@@ -833,20 +833,16 @@ class NativeLens {
     });
   }
 
-  String _customUserMessage(
-    String taskName,
-    String riskLevel,
-    _CustomTaskSignals signals,
-  ) {
+  String _customUserMessage(String riskLevel) {
     if (riskLevel == 'low') {
-      return '$taskName looks ready on this device.';
+      return 'This feature looks ready on this device.';
     }
 
-    if (signals.hardFailureCount > 0) {
-      return '$taskName cannot continue because required device capabilities are missing.';
+    if (riskLevel == 'medium') {
+      return 'This feature may work better with a few device or network improvements.';
     }
 
-    return '$taskName may work, but device conditions are not ideal.';
+    return 'This feature may not work properly on this device.';
   }
 
   String _customDeveloperMessage(
@@ -855,9 +851,20 @@ class NativeLens {
     _CustomTaskSignals signals,
   ) {
     return 'Custom task "$taskName" analyzed with riskLevel=$riskLevel, '
+        'canContinue=${signals.hardFailureCount == 0}, '
         'hardFailures=${signals.hardFailureCount}, '
         'softHighRisks=${signals.softHighRiskCount}, '
-        'softMediumRisks=${signals.softMediumRiskCount}.';
+        'softMediumRisks=${signals.softMediumRiskCount}, '
+        'missingCapabilities=${_formatCustomMessageList(signals.missingCapabilities)}, '
+        'reasons=${_formatCustomMessageList(signals.reasons)}.';
+  }
+
+  String _formatCustomMessageList(List<String> values) {
+    if (values.isEmpty) {
+      return 'none';
+    }
+
+    return values.join(' | ');
   }
 
   /// Emits native Android network capability updates as the active network changes.
