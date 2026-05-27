@@ -1191,6 +1191,137 @@ void main() {
     expect(result.reasons, contains('HEVC encoder is available.'));
   });
 
+  test('analyzeCustomTask reports low camera count as soft risk', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Multi Camera Capture',
+          requirements: const NativeLensTaskRequirements(minCameraCount: 2),
+        );
+
+    expect(result.riskLevel, 'medium');
+    expect(result.severity, 'warning');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('camera count >= 2'));
+    expect(result.missingCapabilities, contains('camera count >= 2'));
+    expect(
+      result.reasons,
+      contains('Camera count is 1, below the required 2.'),
+    );
+    expect(
+      result.recommendations,
+      contains(
+        'Reduce camera-dependent quality requirements or provide a lower-camera fallback.',
+      ),
+    );
+  });
+
+  test('analyzeCustomTask reports low sensor count as soft risk', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Sensor Fusion',
+          requirements: const NativeLensTaskRequirements(minSensorCount: 3),
+        );
+
+    expect(result.riskLevel, 'high');
+    expect(result.severity, 'critical');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('sensor count >= 3'));
+    expect(result.missingCapabilities, contains('sensor count >= 3'));
+    expect(
+      result.reasons,
+      contains('Sensor count is 1, below the required 3.'),
+    );
+    expect(
+      result.recommendations,
+      contains(
+        'Disable optional sensor-driven effects when sensor count is limited.',
+      ),
+    );
+  });
+
+  test('analyzeCustomTask reports low codec count as soft risk', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Codec Matrix',
+          requirements: const NativeLensTaskRequirements(minCodecCount: 5),
+        );
+
+    expect(result.riskLevel, 'high');
+    expect(result.severity, 'critical');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('codec count >= 5'));
+    expect(result.missingCapabilities, contains('codec count >= 5'));
+    expect(result.reasons, contains('Codec count is 2, below the required 5.'));
+    expect(
+      result.recommendations,
+      contains('Use simpler media formats when codec availability is limited.'),
+    );
+  });
+
+  test('analyzeCustomTask reports low refresh rate as soft risk', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'High FPS Effects',
+          requirements: const NativeLensTaskRequirements(minRefreshRate: 144),
+        );
+
+    expect(result.riskLevel, 'medium');
+    expect(result.severity, 'warning');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('refresh rate >= 144Hz'));
+    expect(result.missingCapabilities, contains('refresh rate >= 144Hz'));
+    expect(
+      result.reasons,
+      contains('Refresh rate is 120Hz, below the required 144Hz.'),
+    );
+    expect(
+      result.recommendations,
+      contains('Lower animation or FPS quality when refresh rate is limited.'),
+    );
+  });
+
+  test('analyzeCustomTask passes count and refresh requirements', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Baseline Experience',
+          requirements: const NativeLensTaskRequirements(
+            minCameraCount: 1,
+            minSensorCount: 1,
+            minCodecCount: 2,
+            minRefreshRate: 90,
+          ),
+        );
+
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.missingCapabilities, isEmpty);
+    expect(result.availableCapabilities, contains('camera count >= 1'));
+    expect(result.availableCapabilities, contains('sensor count >= 1'));
+    expect(result.availableCapabilities, contains('codec count >= 2'));
+    expect(result.availableCapabilities, contains('refresh rate >= 90Hz'));
+  });
+
   test('networkCapabilityStream', () async {
     NativeLens nativeLensPlugin = NativeLens();
     MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();

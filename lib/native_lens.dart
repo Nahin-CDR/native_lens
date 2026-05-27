@@ -293,6 +293,26 @@ class NativeLens {
       }
     }
 
+    final int? minCameraCount = requirements.minCameraCount;
+    if (minCameraCount != null) {
+      await _evaluateCustomCameraCountRequirement(minCameraCount, signals);
+    }
+
+    final int? minSensorCount = requirements.minSensorCount;
+    if (minSensorCount != null) {
+      await _evaluateCustomSensorCountRequirement(minSensorCount, signals);
+    }
+
+    final int? minCodecCount = requirements.minCodecCount;
+    if (minCodecCount != null) {
+      await _evaluateCustomCodecCountRequirement(minCodecCount, signals);
+    }
+
+    final double? minRefreshRate = requirements.minRefreshRate;
+    if (minRefreshRate != null) {
+      await _evaluateCustomRefreshRateRequirement(minRefreshRate, signals);
+    }
+
     final int? minBatteryLevel = requirements.minBatteryLevel;
     if (minBatteryLevel != null) {
       await _evaluateCustomBatteryRequirement(minBatteryLevel, signals);
@@ -451,6 +471,117 @@ class NativeLens {
     );
   }
 
+  Future<void> _evaluateCustomCameraCountRequirement(
+    int minCameraCount,
+    _CustomTaskSignals signals,
+  ) async {
+    if (minCameraCount <= 0) {
+      return;
+    }
+
+    final List<CameraCapability> cameras = await getCameraCapabilities();
+    _evaluateCustomMinimumCount(
+      label: 'Camera count',
+      capability: 'camera count >= $minCameraCount',
+      actualCount: cameras.length,
+      requiredCount: minCameraCount,
+      signals: signals,
+    );
+  }
+
+  Future<void> _evaluateCustomSensorCountRequirement(
+    int minSensorCount,
+    _CustomTaskSignals signals,
+  ) async {
+    if (minSensorCount <= 0) {
+      return;
+    }
+
+    final List<NativeSensor> sensors = await getSensors();
+    _evaluateCustomMinimumCount(
+      label: 'Sensor count',
+      capability: 'sensor count >= $minSensorCount',
+      actualCount: sensors.length,
+      requiredCount: minSensorCount,
+      signals: signals,
+    );
+  }
+
+  Future<void> _evaluateCustomCodecCountRequirement(
+    int minCodecCount,
+    _CustomTaskSignals signals,
+  ) async {
+    if (minCodecCount <= 0) {
+      return;
+    }
+
+    final List<MediaCodecCapability> mediaCodecs = await getMediaCodecs();
+    _evaluateCustomMinimumCount(
+      label: 'Codec count',
+      capability: 'codec count >= $minCodecCount',
+      actualCount: mediaCodecs.length,
+      requiredCount: minCodecCount,
+      signals: signals,
+    );
+  }
+
+  Future<void> _evaluateCustomRefreshRateRequirement(
+    double minRefreshRate,
+    _CustomTaskSignals signals,
+  ) async {
+    if (minRefreshRate <= 0) {
+      return;
+    }
+
+    final String requiredRefreshRate = _formatCustomNumber(minRefreshRate);
+    final String capability = 'refresh rate >= ${requiredRefreshRate}Hz';
+    signals.addRequiredCapability(capability);
+
+    final DisplayInfo displayInfo = await getDisplayInfo();
+    final double actualRefreshRate = _maxRefreshRate(displayInfo);
+    final String actualRefreshRateText = _formatCustomNumber(actualRefreshRate);
+
+    if (actualRefreshRate < minRefreshRate) {
+      signals.addMissingCapability(capability);
+      signals.addSoftMediumRisk(
+        'Refresh rate is ${actualRefreshRateText}Hz, below the required ${requiredRefreshRate}Hz.',
+      );
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo(
+      'Refresh rate is ${actualRefreshRateText}Hz, meeting the required ${requiredRefreshRate}Hz.',
+    );
+  }
+
+  void _evaluateCustomMinimumCount({
+    required String label,
+    required String capability,
+    required int actualCount,
+    required int requiredCount,
+    required _CustomTaskSignals signals,
+  }) {
+    signals.addRequiredCapability(capability);
+
+    if (actualCount < requiredCount) {
+      signals.addMissingCapability(capability);
+      final String reason =
+          '$label is $actualCount, below the required $requiredCount.';
+      if (actualCount == 0 || actualCount * 2 < requiredCount) {
+        signals.addSoftHighRisk(reason);
+      } else {
+        signals.addSoftMediumRisk(reason);
+      }
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo(
+      '$label is $actualCount, meeting the required $requiredCount.',
+    );
+  }
+
   Future<void> _evaluateCustomBatteryRequirement(
     int minBatteryLevel,
     _CustomTaskSignals signals,
@@ -601,6 +732,30 @@ class NativeLens {
       recommendations.add('Use H.264 fallback when HEVC is unavailable.');
     }
 
+    if (_hasMissingCapabilityPrefix(signals, 'camera count')) {
+      recommendations.add(
+        'Reduce camera-dependent quality requirements or provide a lower-camera fallback.',
+      );
+    }
+
+    if (_hasMissingCapabilityPrefix(signals, 'sensor count')) {
+      recommendations.add(
+        'Disable optional sensor-driven effects when sensor count is limited.',
+      );
+    }
+
+    if (_hasMissingCapabilityPrefix(signals, 'codec count')) {
+      recommendations.add(
+        'Use simpler media formats when codec availability is limited.',
+      );
+    }
+
+    if (_hasMissingCapabilityPrefix(signals, 'refresh rate')) {
+      recommendations.add(
+        'Lower animation or FPS quality when refresh rate is limited.',
+      );
+    }
+
     final bool hasBatteryRisk = signals.missingCapabilities.any((
       String capability,
     ) {
@@ -614,6 +769,12 @@ class NativeLens {
     }
 
     return recommendations;
+  }
+
+  bool _hasMissingCapabilityPrefix(_CustomTaskSignals signals, String prefix) {
+    return signals.missingCapabilities.any((String capability) {
+      return capability.startsWith(prefix);
+    });
   }
 
   String _customUserMessage(
@@ -835,6 +996,14 @@ class NativeLens {
             normalizedSignal.contains('h265');
       });
     });
+  }
+
+  String _formatCustomNumber(num value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+
+    return value.toString();
   }
 
   double _maxRefreshRate(DisplayInfo displayInfo) {
