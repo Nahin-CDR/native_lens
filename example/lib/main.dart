@@ -33,6 +33,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   NativeLensTask _selectedTask = NativeLensTask.videoUpload;
   NativeTaskRiskResult? _taskRiskResult;
   NativeLensCustomTaskResult? _customTaskResult;
+  NativeLensPreset _selectedPreset = NativeLensPreset.liveStreaming;
+  NativeLensCustomTaskResult? _presetTaskResult;
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   StreamSubscription<DeviceOrientationInfo>? _deviceOrientationSubscription;
@@ -41,12 +43,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
   bool _isAnalyzingCustomTask = false;
+  bool _isAnalyzingPresetTask = false;
   bool _customRequiresCamera = true;
   bool _customRequiresMicrophone = false;
   bool _customRequiresStableNetwork = false;
   String? _errorMessage;
   String? _taskRiskErrorMessage;
   String? _customTaskErrorMessage;
+  String? _presetTaskErrorMessage;
 
   @override
   void initState() {
@@ -326,6 +330,34 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _customTaskResult = result;
       _isAnalyzingCustomTask = false;
       _customTaskErrorMessage = errorMessage;
+    });
+  }
+
+  Future<void> analyzePresetFeature() async {
+    setState(() {
+      _isAnalyzingPresetTask = true;
+      _presetTaskErrorMessage = null;
+    });
+
+    NativeLensCustomTaskResult? result;
+    String? errorMessage;
+
+    try {
+      result = await _nativeLensPlugin.analyzePresetTask(_selectedPreset);
+    } on PlatformException {
+      errorMessage = 'Failed to analyze preset feature.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    } catch (error) {
+      errorMessage = 'Failed to analyze preset feature: $error';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _presetTaskResult = result;
+      _isAnalyzingPresetTask = false;
+      _presetTaskErrorMessage = errorMessage;
     });
   }
 
@@ -764,6 +796,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Widget _customTaskRequirementsSection() {
     final NativeLensCustomTaskResult? result = _customTaskResult;
+    final NativeLensCustomTaskResult? presetResult = _presetTaskResult;
 
     return _sectionCard(
       title: 'Custom Task Requirements',
@@ -842,6 +875,64 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           if (result != null) ...<Widget>[
             const SizedBox(height: 12),
             _customTaskResultPanel(result),
+          ],
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+          const Text(
+            'Preset Feature Preflight',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<NativeLensPreset>(
+            initialValue: _selectedPreset,
+            decoration: const InputDecoration(
+              labelText: 'Preset',
+              border: OutlineInputBorder(),
+            ),
+            items: NativeLensPreset.values
+                .map(
+                  (NativeLensPreset preset) =>
+                      DropdownMenuItem<NativeLensPreset>(
+                        value: preset,
+                        child: Text(preset.name),
+                      ),
+                )
+                .toList(),
+            onChanged: _isAnalyzingPresetTask
+                ? null
+                : (NativeLensPreset? value) {
+                    if (value == null) return;
+
+                    setState(() {
+                      _selectedPreset = value;
+                    });
+                  },
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _isAnalyzingPresetTask ? null : analyzePresetFeature,
+            icon: _isAnalyzingPresetTask
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.fact_check_rounded),
+            label: Text(
+              _isAnalyzingPresetTask ? 'Analyzing...' : 'Analyze Preset',
+            ),
+          ),
+          if (_presetTaskErrorMessage != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _presetTaskErrorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (presetResult != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _customTaskResultPanel(presetResult),
           ],
         ],
       ),
