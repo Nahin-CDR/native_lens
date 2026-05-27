@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:native_lens/native_lens.dart';
 import 'package:native_lens/native_lens_platform_interface.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
+import 'package:native_lens/src/preset_task_mapping.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class MockNativeLensPlatform
@@ -450,6 +451,12 @@ class MockMicrophonePlatform extends MockNativeLensPlatform {
       SystemFeature(name: 'OpenGL ES', version: 196608, isGlEsFeature: true),
     ]);
   }
+}
+
+Map<String, Object?> stableCustomTaskResultFields(
+  NativeLensCustomTaskResult result,
+) {
+  return Map<String, Object?>.from(result.toMap())..remove('analyzedAtMillis');
 }
 
 void main() {
@@ -904,6 +911,54 @@ void main() {
       contains('Camera capability is available.'),
     );
     expect(result.analyzedAtMillis, greaterThanOrEqualTo(beforeAnalysis));
+  });
+
+  test('analyzePresetTask matches equivalent custom task analysis', () async {
+    for (final NativeLensPreset preset in NativeLensPreset.values) {
+      NativeLensPlatform.instance = MockNativeLensPlatform();
+      final NativeLens nativeLensPlugin = NativeLens();
+
+      final NativeLensCustomTaskResult presetResult = await nativeLensPlugin
+          .analyzePresetTask(preset);
+
+      NativeLensPlatform.instance = MockNativeLensPlatform();
+      final NativeLensCustomTaskResult customResult = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: nativeLensPresetDisplayName(preset),
+            requirements: nativeLensPresetRequirements(preset),
+          );
+
+      expect(presetResult, isA<NativeLensCustomTaskResult>());
+      expect(presetResult.taskName, nativeLensPresetDisplayName(preset));
+      expect(
+        stableCustomTaskResultFields(presetResult),
+        stableCustomTaskResultFields(customResult),
+      );
+    }
+  });
+
+  test('analyzePresetTask leaves existing task APIs unchanged', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    NativeLensPlatform.instance = MockNativeLensPlatform();
+
+    final NativeTaskRiskResult taskRiskResult = await nativeLensPlugin
+        .analyzeTaskRisk(task: NativeLensTask.videoUpload);
+
+    expect(taskRiskResult.task, NativeLensTask.videoUpload);
+    expect(taskRiskResult.riskLevel, 'low');
+
+    NativeLensPlatform.instance = MockNativeLensPlatform();
+    final NativeLensCustomTaskResult customTaskResult = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Manual Upload',
+          requirements: const NativeLensTaskRequirements(
+            requiresStableNetwork: true,
+          ),
+        );
+
+    expect(customTaskResult.taskName, 'Manual Upload');
+    expect(customTaskResult.riskLevel, 'low');
+    expect(customTaskResult.requiredCapabilities, contains('stable network'));
   });
 
   test('analyzeCustomTask returns high risk when camera is missing', () async {

@@ -10,11 +10,13 @@ import 'native_lens_platform_interface.dart';
 import 'native_lens_report.dart';
 import 'native_sensor.dart';
 import 'native_task_risk_result.dart';
+import 'native_lens_preset.dart';
 import 'native_lens_task_requirements.dart';
 import 'network_capability.dart';
 import 'network_speed_sample.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
+import 'src/preset_task_mapping.dart';
 import 'system_feature.dart';
 import 'device_orientation_info.dart';
 import 'native_lens_task.dart';
@@ -355,6 +357,16 @@ class NativeLens {
       userMessage: _customUserMessage(riskLevel),
       developerMessage: _customDeveloperMessage(taskName, riskLevel, signals),
       analyzedAtMillis: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Analyzes a ready-made preset task using the custom task rule engine.
+  Future<NativeLensCustomTaskResult> analyzePresetTask(
+    NativeLensPreset preset,
+  ) {
+    return analyzeCustomTask(
+      taskName: nativeLensPresetDisplayName(preset),
+      requirements: nativeLensPresetRequirements(preset),
     );
   }
 
