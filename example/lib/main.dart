@@ -17,6 +17,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _nativeLensPlugin = NativeLens();
+  final TextEditingController _customMinBatteryController =
+      TextEditingController(text: '20');
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
   List<NativeSensor>? _sensors;
@@ -39,6 +41,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
   bool _isAnalyzingCustomTask = false;
+  bool _customRequiresCamera = true;
+  bool _customRequiresMicrophone = false;
+  bool _customRequiresStableNetwork = false;
   String? _errorMessage;
   String? _taskRiskErrorMessage;
   String? _customTaskErrorMessage;
@@ -57,6 +62,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _customMinBatteryController.dispose();
     _powerStateSubscription?.cancel();
     _networkCapabilitySubscription?.cancel();
     _networkSpeedSubscription?.cancel();
@@ -291,14 +297,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     NativeLensCustomTaskResult? result;
     String? errorMessage;
+    final int? minBatteryLevel = int.tryParse(
+      _customMinBatteryController.text.trim(),
+    );
 
     try {
       result = await _nativeLensPlugin.analyzeCustomTask(
         taskName: 'Face Filter Camera',
-        requirements: const NativeLensTaskRequirements(
-          requiresCamera: true,
-          requiredSensors: <String>['gyroscope', 'accelerometer'],
-          minBatteryLevel: 20,
+        requirements: NativeLensTaskRequirements(
+          requiresCamera: _customRequiresCamera,
+          requiresMicrophone: _customRequiresMicrophone,
+          requiresStableNetwork: _customRequiresStableNetwork,
+          requiredSensors: const <String>['gyroscope', 'accelerometer'],
+          minBatteryLevel: minBatteryLevel,
         ),
       );
     } on PlatformException {
@@ -759,6 +770,53 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Requires camera'),
+            value: _customRequiresCamera,
+            onChanged: _isAnalyzingCustomTask
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _customRequiresCamera = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Requires microphone'),
+            value: _customRequiresMicrophone,
+            onChanged: _isAnalyzingCustomTask
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _customRequiresMicrophone = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Requires stable network'),
+            value: _customRequiresStableNetwork,
+            onChanged: _isAnalyzingCustomTask
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _customRequiresStableNetwork = value;
+                    });
+                  },
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _customMinBatteryController,
+            enabled: !_isAnalyzingCustomTask,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Minimum battery level',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: _isAnalyzingCustomTask ? null : analyzeFaceFilterCamera,
             icon: _isAnalyzingCustomTask
