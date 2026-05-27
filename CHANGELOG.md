@@ -1,3 +1,9 @@
+## 0.8.1
+
+- Added Articles & Announcements links to README.
+- Added Medium article link.
+- Added LinkedIn launch post link.
+
 ## 0.8.0
 
 - Added Custom Task Requirements API.
