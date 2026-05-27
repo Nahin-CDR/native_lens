@@ -263,6 +263,14 @@ class NativeLens {
       await _evaluateCustomStableNetworkRequirement(signals);
     }
 
+    if (requirements.requiresUnmeteredNetwork) {
+      await _evaluateCustomUnmeteredNetworkRequirement(signals);
+    }
+
+    if (!requirements.allowPowerSaveMode) {
+      await _evaluateCustomPowerSaveModeRequirement(signals);
+    }
+
     if (requirements.requiresMicrophone ||
         requirements.requiredSystemFeatures.isNotEmpty) {
       final List<SystemFeature> systemFeatures = await getSystemFeatures();
@@ -389,6 +397,44 @@ class NativeLens {
 
     signals.addAvailableCapability(capability);
     signals.addInfo('Stable network is available.');
+  }
+
+  Future<void> _evaluateCustomUnmeteredNetworkRequirement(
+    _CustomTaskSignals signals,
+  ) async {
+    const String capability = 'unmetered network';
+    signals.addRequiredCapability(capability);
+
+    final NetworkCapability networkCapability = await getNetworkCapability();
+    if (networkCapability.isMetered) {
+      signals.addMissingCapability(capability);
+      signals.addSoftMediumRisk(
+        'Unmetered network is required but the active network is metered.',
+      );
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo('Unmetered network is available.');
+  }
+
+  Future<void> _evaluateCustomPowerSaveModeRequirement(
+    _CustomTaskSignals signals,
+  ) async {
+    const String capability = 'power saver disabled';
+    signals.addRequiredCapability(capability);
+
+    final PowerState powerState = await getPowerState();
+    if (powerState.isPowerSaveMode) {
+      signals.addMissingCapability(capability);
+      signals.addSoftMediumRisk(
+        'Power saver mode is enabled but this task disallows it.',
+      );
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo('Power saver mode is disabled.');
   }
 
   void _evaluateCustomMicrophoneRequirement(
@@ -730,6 +776,16 @@ class NativeLens {
 
     if (signals.missingCapabilities.contains('HEVC encoder')) {
       recommendations.add('Use H.264 fallback when HEVC is unavailable.');
+    }
+
+    if (signals.missingCapabilities.contains('unmetered network')) {
+      recommendations.add(
+        'Use Wi-Fi or another unmetered network for this task.',
+      );
+    }
+
+    if (signals.missingCapabilities.contains('power saver disabled')) {
+      recommendations.add('Disable power saver mode for this task.');
     }
 
     if (_hasMissingCapabilityPrefix(signals, 'camera count')) {

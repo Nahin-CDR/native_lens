@@ -380,6 +380,27 @@ class MockDisconnectedNetworkPlatform extends MockNativeLensPlatform {
   }
 }
 
+class MockMeteredNetworkPlatform extends MockNativeLensPlatform {
+  @override
+  Future<NetworkCapability> getNetworkCapability() {
+    return Future<NetworkCapability>.value(
+      const NetworkCapability(
+        isConnected: true,
+        transportType: 'Cellular',
+        isValidated: true,
+        isMetered: true,
+        hasVpn: false,
+        hasWifi: false,
+        hasCellular: true,
+        hasEthernet: false,
+        hasBluetooth: false,
+        hasLowLatency: false,
+        hasHighBandwidth: false,
+      ),
+    );
+  }
+}
+
 class MockLowBatteryPlatform extends MockNativeLensPlatform {
   @override
   Future<PowerState> getPowerState() {
@@ -1320,6 +1341,110 @@ void main() {
     expect(result.availableCapabilities, contains('sensor count >= 1'));
     expect(result.availableCapabilities, contains('codec count >= 2'));
     expect(result.availableCapabilities, contains('refresh rate >= 90Hz'));
+  });
+
+  test(
+    'analyzeCustomTask reports metered network when unmetered is required',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockMeteredNetworkPlatform fakePlatform = MockMeteredNetworkPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'Large Upload',
+            requirements: const NativeLensTaskRequirements(
+              requiresUnmeteredNetwork: true,
+            ),
+          );
+
+      expect(result.riskLevel, 'medium');
+      expect(result.severity, 'warning');
+      expect(result.canContinue, isTrue);
+      expect(result.requiredCapabilities, contains('unmetered network'));
+      expect(result.missingCapabilities, contains('unmetered network'));
+      expect(
+        result.reasons,
+        contains(
+          'Unmetered network is required but the active network is metered.',
+        ),
+      );
+      expect(
+        result.recommendations,
+        contains('Use Wi-Fi or another unmetered network for this task.'),
+      );
+    },
+  );
+
+  test('analyzeCustomTask passes unmetered network requirement', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Large Upload',
+          requirements: const NativeLensTaskRequirements(
+            requiresUnmeteredNetwork: true,
+          ),
+        );
+
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('unmetered network'));
+    expect(result.availableCapabilities, contains('unmetered network'));
+    expect(result.missingCapabilities, isEmpty);
+    expect(result.reasons, contains('Unmetered network is available.'));
+  });
+
+  test('analyzeCustomTask reports power saver when disallowed', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockHighRiskPlatform fakePlatform = MockHighRiskPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Realtime Effects',
+          requirements: const NativeLensTaskRequirements(
+            allowPowerSaveMode: false,
+          ),
+        );
+
+    expect(result.riskLevel, 'medium');
+    expect(result.severity, 'warning');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('power saver disabled'));
+    expect(result.missingCapabilities, contains('power saver disabled'));
+    expect(
+      result.reasons,
+      contains('Power saver mode is enabled but this task disallows it.'),
+    );
+    expect(
+      result.recommendations,
+      contains('Disable power saver mode for this task.'),
+    );
+  });
+
+  test('analyzeCustomTask passes when power saver is allowed', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockHighRiskPlatform fakePlatform = MockHighRiskPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Background Mode',
+          requirements: const NativeLensTaskRequirements(),
+        );
+
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.missingCapabilities, isEmpty);
+    expect(
+      result.reasons,
+      contains('No blocking custom task requirements were detected.'),
+    );
   });
 
   test('networkCapabilityStream', () async {
