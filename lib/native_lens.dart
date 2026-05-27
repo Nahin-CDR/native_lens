@@ -281,6 +281,18 @@ class NativeLens {
       }
     }
 
+    if (requirements.requiresMediaCodecs || requirements.requiresHevcEncoder) {
+      final List<MediaCodecCapability> mediaCodecs = await getMediaCodecs();
+
+      if (requirements.requiresMediaCodecs) {
+        _evaluateCustomMediaCodecsRequirement(mediaCodecs, signals);
+      }
+
+      if (requirements.requiresHevcEncoder) {
+        _evaluateCustomHevcEncoderRequirement(mediaCodecs, signals);
+      }
+    }
+
     final int? minBatteryLevel = requirements.minBatteryLevel;
     if (minBatteryLevel != null) {
       await _evaluateCustomBatteryRequirement(minBatteryLevel, signals);
@@ -398,6 +410,44 @@ class NativeLens {
     signals.addMissingCapability(requiredSystemFeature);
     signals.addHardFailure(
       'System feature $requiredSystemFeature is required but unavailable.',
+    );
+  }
+
+  void _evaluateCustomMediaCodecsRequirement(
+    List<MediaCodecCapability> mediaCodecs,
+    _CustomTaskSignals signals,
+  ) {
+    const String capability = 'media codec capability';
+    signals.addRequiredCapability(capability);
+
+    if (mediaCodecs.isEmpty) {
+      signals.addMissingCapability(capability);
+      signals.addHardFailure(
+        'Media codec capability is required but unavailable.',
+      );
+      return;
+    }
+
+    signals.addAvailableCapability(capability);
+    signals.addInfo('Media codec capability is available.');
+  }
+
+  void _evaluateCustomHevcEncoderRequirement(
+    List<MediaCodecCapability> mediaCodecs,
+    _CustomTaskSignals signals,
+  ) {
+    const String capability = 'HEVC encoder';
+    signals.addRequiredCapability(capability);
+
+    if (_hasCustomHevcEncoder(mediaCodecs)) {
+      signals.addAvailableCapability(capability);
+      signals.addInfo('HEVC encoder is available.');
+      return;
+    }
+
+    signals.addMissingCapability(capability);
+    signals.addSoftMediumRisk(
+      'HEVC encoder is unavailable; use H.264 fallback.',
     );
   }
 
@@ -547,7 +597,17 @@ class NativeLens {
       );
     }
 
-    if (signals.softHighRiskCount > 0 || signals.softMediumRiskCount > 0) {
+    if (signals.missingCapabilities.contains('HEVC encoder')) {
+      recommendations.add('Use H.264 fallback when HEVC is unavailable.');
+    }
+
+    final bool hasBatteryRisk = signals.missingCapabilities.any((
+      String capability,
+    ) {
+      return capability.startsWith('battery level');
+    });
+    if (hasBatteryRisk &&
+        (signals.softHighRiskCount > 0 || signals.softMediumRiskCount > 0)) {
       recommendations.add(
         'Consider delaying heavy work until battery conditions improve.',
       );
@@ -753,6 +813,26 @@ class NativeLens {
         final String normalizedType = supportedType.toLowerCase();
         return normalizedType.contains('hevc') ||
             normalizedType.contains('h265');
+      });
+    });
+  }
+
+  bool _hasCustomHevcEncoder(List<MediaCodecCapability> codecs) {
+    return codecs.any((MediaCodecCapability codec) {
+      if (!codec.isEncoder) {
+        return false;
+      }
+
+      final List<String> codecSignals = <String>[
+        codec.name,
+        ...codec.supportedTypes,
+        ...codec.supportedVideoTypes,
+      ];
+
+      return codecSignals.any((String signal) {
+        final String normalizedSignal = signal.toLowerCase();
+        return normalizedSignal.contains('hevc') ||
+            normalizedSignal.contains('h265');
       });
     });
   }

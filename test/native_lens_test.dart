@@ -289,6 +289,13 @@ class MockHevcPlatform extends MockNativeLensPlatform {
   }
 }
 
+class MockNoMediaCodecPlatform extends MockNativeLensPlatform {
+  @override
+  Future<List<MediaCodecCapability>> getMediaCodecs() {
+    return Future<List<MediaCodecCapability>>.value(<MediaCodecCapability>[]);
+  }
+}
+
 class MockHighRiskPlatform extends MockNativeLensPlatform {
   @override
   Future<PowerState> getPowerState() {
@@ -1079,6 +1086,109 @@ void main() {
       result.reasons,
       contains('System feature $featureName is available.'),
     );
+  });
+
+  test(
+    'analyzeCustomTask returns high risk when media codecs are missing',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockNoMediaCodecPlatform fakePlatform = MockNoMediaCodecPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'Media Export',
+            requirements: const NativeLensTaskRequirements(
+              requiresMediaCodecs: true,
+            ),
+          );
+
+      expect(result.riskLevel, 'high');
+      expect(result.severity, 'critical');
+      expect(result.canContinue, isFalse);
+      expect(result.requiredCapabilities, contains('media codec capability'));
+      expect(result.missingCapabilities, contains('media codec capability'));
+      expect(
+        result.reasons,
+        contains('Media codec capability is required but unavailable.'),
+      );
+      expect(result.recommendations, isNotEmpty);
+    },
+  );
+
+  test('analyzeCustomTask reports available media codecs', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Media Export',
+          requirements: const NativeLensTaskRequirements(
+            requiresMediaCodecs: true,
+          ),
+        );
+
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('media codec capability'));
+    expect(result.availableCapabilities, contains('media codec capability'));
+    expect(result.missingCapabilities, isEmpty);
+    expect(result.reasons, contains('Media codec capability is available.'));
+  });
+
+  test(
+    'analyzeCustomTask returns medium risk when HEVC encoder is missing',
+    () async {
+      NativeLens nativeLensPlugin = NativeLens();
+      MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+      NativeLensPlatform.instance = fakePlatform;
+
+      final NativeLensCustomTaskResult result = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: 'HEVC Export',
+            requirements: const NativeLensTaskRequirements(
+              requiresHevcEncoder: true,
+            ),
+          );
+
+      expect(result.riskLevel, 'medium');
+      expect(result.severity, 'warning');
+      expect(result.canContinue, isTrue);
+      expect(result.requiredCapabilities, contains('HEVC encoder'));
+      expect(result.missingCapabilities, contains('HEVC encoder'));
+      expect(
+        result.reasons,
+        contains('HEVC encoder is unavailable; use H.264 fallback.'),
+      );
+      expect(
+        result.recommendations,
+        contains('Use H.264 fallback when HEVC is unavailable.'),
+      );
+    },
+  );
+
+  test('analyzeCustomTask reports available HEVC encoder', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockHevcPlatform fakePlatform = MockHevcPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'HEVC Export',
+          requirements: const NativeLensTaskRequirements(
+            requiresHevcEncoder: true,
+          ),
+        );
+
+    expect(result.riskLevel, 'low');
+    expect(result.severity, 'info');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('HEVC encoder'));
+    expect(result.availableCapabilities, contains('HEVC encoder'));
+    expect(result.missingCapabilities, isEmpty);
+    expect(result.reasons, contains('HEVC encoder is available.'));
   });
 
   test('networkCapabilityStream', () async {
