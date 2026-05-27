@@ -30,6 +30,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   DeviceOrientationInfo? _deviceOrientation;
   NativeLensTask _selectedTask = NativeLensTask.videoUpload;
   NativeTaskRiskResult? _taskRiskResult;
+  NativeLensCustomTaskResult? _customTaskResult;
   StreamSubscription<NetworkCapability>? _networkCapabilitySubscription;
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   StreamSubscription<DeviceOrientationInfo>? _deviceOrientationSubscription;
@@ -37,8 +38,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _isGeneratingReport = false;
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
+  bool _isAnalyzingCustomTask = false;
   String? _errorMessage;
   String? _taskRiskErrorMessage;
+  String? _customTaskErrorMessage;
 
   @override
   void initState() {
@@ -280,6 +283,41 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> analyzeFaceFilterCamera() async {
+    setState(() {
+      _isAnalyzingCustomTask = true;
+      _customTaskErrorMessage = null;
+    });
+
+    NativeLensCustomTaskResult? result;
+    String? errorMessage;
+
+    try {
+      result = await _nativeLensPlugin.analyzeCustomTask(
+        taskName: 'Face Filter Camera',
+        requirements: const NativeLensTaskRequirements(
+          requiresCamera: true,
+          requiredSensors: <String>['gyroscope', 'accelerometer'],
+          minBatteryLevel: 20,
+        ),
+      );
+    } on PlatformException {
+      errorMessage = 'Failed to analyze custom task requirements.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    } catch (error) {
+      errorMessage = 'Failed to analyze custom task requirements: $error';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _customTaskResult = result;
+      _isAnalyzingCustomTask = false;
+      _customTaskErrorMessage = errorMessage;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -426,6 +464,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           const SizedBox(height: 16),
 
           _taskRiskAnalysisSection(),
+
+          const SizedBox(height: 16),
+
+          _customTaskRequirementsSection(),
 
           const SizedBox(height: 16),
 
@@ -704,6 +746,90 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 4),
           Text(result.recommendation),
+        ],
+      ),
+    );
+  }
+
+  Widget _customTaskRequirementsSection() {
+    final NativeLensCustomTaskResult? result = _customTaskResult;
+
+    return _sectionCard(
+      title: 'Custom Task Requirements',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          FilledButton.tonalIcon(
+            onPressed: _isAnalyzingCustomTask ? null : analyzeFaceFilterCamera,
+            icon: _isAnalyzingCustomTask
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.face_retouching_natural_rounded),
+            label: Text(
+              _isAnalyzingCustomTask
+                  ? 'Analyzing...'
+                  : 'Analyze Face Filter Camera',
+            ),
+          ),
+          if (_customTaskErrorMessage != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _customTaskErrorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (result != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _customTaskResultPanel(result),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _customTaskResultPanel(NativeLensCustomTaskResult result) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _SummaryRow(label: 'Risk', value: result.riskLevel),
+          _SummaryRow(label: 'Severity', value: result.severity),
+          _SummaryRow(
+            label: 'Can Continue',
+            value: result.canContinue ? 'Yes' : 'No',
+          ),
+          _SummaryRow(label: 'User Message', value: result.userMessage),
+          _SummaryRow(label: 'Developer', value: result.developerMessage),
+          const SizedBox(height: 8),
+          _capabilitySection(
+            title: 'Missing Capabilities',
+            capabilities: result.missingCapabilities,
+            emptyMessage: 'No missing custom task capabilities detected.',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Recommendations',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          if (result.recommendations.isEmpty)
+            const Text('No recommendations.')
+          else
+            ...result.recommendations.map(
+              (String recommendation) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('- $recommendation'),
+              ),
+            ),
         ],
       ),
     );
