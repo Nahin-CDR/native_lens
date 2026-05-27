@@ -301,6 +301,36 @@ The result includes:
 - `userMessage`
 - `developerMessage`
 
+### Preset Feature Preflight
+
+Developers can use ready-made preset checks for common feature flows without
+manually building `NativeLensTaskRequirements`.
+
+```dart
+final result = await NativeLens().analyzePresetTask(
+  NativeLensPreset.liveStreaming,
+);
+
+print(result.riskLevel);
+print(result.canContinue);
+print(result.userMessage);
+print(result.recommendations);
+```
+
+Available presets:
+
+- `liveStreaming`
+- `videoUpload`
+- `faceFilterCamera`
+- `cameraRecording`
+- `backgroundSync`
+- `arExperience`
+- `stepTracking`
+- `compassNavigation`
+- `mediaProcessing`
+
+Presets reuse the same Custom Task Requirements engine internally.
+
 ### Dataset Pipeline
 
 Generate a stable dataset row from the current NativeLens report and
