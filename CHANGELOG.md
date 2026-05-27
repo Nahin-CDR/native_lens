@@ -1,4 +1,13 @@
-## Unreleased
+## 0.8.0 - Unreleased
+
+- Added Custom Task Requirements API.
+- Added `NativeLensTaskRequirements` model.
+- Added `NativeLensCustomTaskResult` model.
+- Added `analyzeCustomTask()`.
+- Added rule-based checks for camera, microphone, network, battery, sensors,
+  system features, media codecs, HEVC, counts, refresh rate, and power saver.
+- Added example app custom task demo.
+- Added README guide for custom task requirements.
 
 ## 0.7.0
 
