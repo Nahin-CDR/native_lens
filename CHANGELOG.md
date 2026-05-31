@@ -1,4 +1,4 @@
-## 0.10.0 - Unreleased
+## 0.10.0
 
 - Added native theme mode detection.
 - Added real-time theme mode stream.
