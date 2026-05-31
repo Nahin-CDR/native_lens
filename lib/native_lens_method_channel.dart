@@ -6,6 +6,7 @@ import 'device_orientation_info.dart';
 import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_platform_interface.dart';
+import 'native_lens_theme_mode.dart';
 import 'native_sensor.dart';
 import 'network_capability.dart';
 import 'network_speed_sample.dart';
@@ -40,6 +41,10 @@ class MethodChannelNativeLens extends NativeLensPlatform {
   /// The event channel used to receive live power state updates.
   @visibleForTesting
   final powerStateEventChannel = const EventChannel('native_lens/power_state');
+
+  /// The event channel used to receive live native theme mode updates.
+  @visibleForTesting
+  final themeModeEventChannel = const EventChannel('native_lens/theme_mode');
 
   @override
   Future<PlatformSummary> getPlatformSummary() async {
@@ -190,6 +195,22 @@ class MethodChannelNativeLens extends NativeLensPlatform {
   }
 
   @override
+  Future<NativeLensThemeMode> getThemeMode() async {
+    final Object? themeMode = await methodChannel.invokeMethod<Object?>(
+      'getThemeMode',
+    );
+
+    return _themeModeFromNative(themeMode);
+  }
+
+  @override
+  Stream<NativeLensThemeMode> watchThemeMode() {
+    return themeModeEventChannel.receiveBroadcastStream().map(
+      _themeModeFromNative,
+    );
+  }
+
+  @override
   Future<NetworkCapability> getNetworkCapability() async {
     final Map<Object?, Object?>? networkMap = await methodChannel
         .invokeMapMethod<Object?, Object?>('getNetworkCapability');
@@ -257,4 +278,21 @@ class MethodChannelNativeLens extends NativeLensPlatform {
       return NetworkSpeedSample.fromMap(<Object?, Object?>{});
     });
   }
+}
+
+NativeLensThemeMode _themeModeFromNative(Object? value) {
+  if (value is! String) {
+    return NativeLensThemeMode.unknown;
+  }
+
+  switch (value) {
+    case 'light':
+      return NativeLensThemeMode.light;
+    case 'dark':
+      return NativeLensThemeMode.dark;
+    case 'unknown':
+      return NativeLensThemeMode.unknown;
+  }
+
+  return NativeLensThemeMode.unknown;
 }

@@ -4,6 +4,7 @@ import 'package:native_lens/camera_capability.dart';
 import 'package:native_lens/display_info.dart';
 import 'package:native_lens/media_codec_capability.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
+import 'package:native_lens/native_lens_theme_mode.dart';
 import 'package:native_lens/native_sensor.dart';
 import 'package:native_lens/network_capability.dart';
 import 'package:native_lens/platform_summary.dart';
@@ -18,6 +19,7 @@ void main() {
   const EventChannel powerStateChannel = EventChannel(
     'native_lens/power_state',
   );
+  const EventChannel themeModeChannel = EventChannel('native_lens/theme_mode');
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -157,6 +159,8 @@ void main() {
         .setMockMethodCallHandler(channel, null);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockStreamHandler(powerStateChannel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockStreamHandler(themeModeChannel, null);
   });
 
   test('getPlatformSummary', () async {
@@ -292,6 +296,69 @@ void main() {
     expect(powerState.chargingSource, 'USB');
     expect(powerState.batteryStatus, 'Charging');
     expect(powerState.batteryTemperatureCelsius, 30.5);
+  });
+
+  test('getThemeMode parses light dark and unknown', () async {
+    final Map<String, NativeLensThemeMode> expectedValues =
+        <String, NativeLensThemeMode>{
+          'light': NativeLensThemeMode.light,
+          'dark': NativeLensThemeMode.dark,
+          'unknown': NativeLensThemeMode.unknown,
+        };
+
+    for (final MapEntry<String, NativeLensThemeMode> expectedValue
+        in expectedValues.entries) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+            if (methodCall.method == 'getThemeMode') {
+              return expectedValue.key;
+            }
+
+            return null;
+          });
+
+      expect(await platform.getThemeMode(), expectedValue.value);
+    }
+  });
+
+  test('getThemeMode returns unknown for invalid or null payloads', () async {
+    for (final Object? payload in <Object?>['system', 42, null]) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+            if (methodCall.method == 'getThemeMode') {
+              return payload;
+            }
+
+            return null;
+          });
+
+      expect(await platform.getThemeMode(), NativeLensThemeMode.unknown);
+    }
+  });
+
+  test('watchThemeMode parses stream values', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockStreamHandler(
+          themeModeChannel,
+          MockStreamHandler.inline(
+            onListen: (Object? arguments, MockStreamHandlerEventSink events) {
+              events.success('light');
+              events.success('dark');
+              events.success('unknown');
+              events.success('invalid');
+              events.success(null);
+              events.endOfStream();
+            },
+          ),
+        );
+
+    expect(await platform.watchThemeMode().toList(), <NativeLensThemeMode>[
+      NativeLensThemeMode.light,
+      NativeLensThemeMode.dark,
+      NativeLensThemeMode.unknown,
+      NativeLensThemeMode.unknown,
+      NativeLensThemeMode.unknown,
+    ]);
   });
 
   test('getNetworkCapability', () async {

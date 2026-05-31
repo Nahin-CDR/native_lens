@@ -12,6 +12,7 @@ import 'native_sensor.dart';
 import 'native_task_risk_result.dart';
 import 'native_lens_preset.dart';
 import 'native_lens_task_requirements.dart';
+import 'native_lens_theme_mode.dart';
 import 'network_capability.dart';
 import 'network_speed_sample.dart';
 import 'platform_summary.dart';
@@ -86,6 +87,16 @@ class NativeLens {
   /// battery or power state changes.
   Stream<PowerState> watchPowerState() {
     return NativeLensPlatform.instance.watchPowerState();
+  }
+
+  /// Returns the native system theme mode reported by the platform.
+  Future<NativeLensThemeMode> getThemeMode() {
+    return NativeLensPlatform.instance.getThemeMode();
+  }
+
+  /// Emits native system theme mode updates while the platform reports changes.
+  Stream<NativeLensThemeMode> watchThemeMode() {
+    return NativeLensPlatform.instance.watchThemeMode();
   }
 
   /// Returns native Android network capability information for the active network.

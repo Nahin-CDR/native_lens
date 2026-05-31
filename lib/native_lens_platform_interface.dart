@@ -6,6 +6,7 @@ import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_method_channel.dart';
 import 'native_sensor.dart';
+import 'native_lens_theme_mode.dart';
 import 'network_capability.dart';
 import 'network_speed_sample.dart';
 import 'platform_summary.dart';
@@ -74,6 +75,16 @@ abstract class NativeLensPlatform extends PlatformInterface {
   /// Emits native battery and power state updates as the platform reports them.
   Stream<PowerState> watchPowerState() {
     throw UnimplementedError('watchPowerState() has not been implemented.');
+  }
+
+  /// Returns the native system theme mode reported by the platform.
+  Future<NativeLensThemeMode> getThemeMode() {
+    throw UnimplementedError('getThemeMode() has not been implemented.');
+  }
+
+  /// Emits native system theme mode updates as the platform reports them.
+  Stream<NativeLensThemeMode> watchThemeMode() {
+    throw UnimplementedError('watchThemeMode() has not been implemented.');
   }
 
   /// Returns native Android network capability information for the active network.

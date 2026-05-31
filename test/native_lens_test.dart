@@ -150,6 +150,16 @@ class MockNativeLensPlatform
   }
 
   @override
+  Future<NativeLensThemeMode> getThemeMode() {
+    return Future<NativeLensThemeMode>.value(NativeLensThemeMode.dark);
+  }
+
+  @override
+  Stream<NativeLensThemeMode> watchThemeMode() {
+    return Stream<NativeLensThemeMode>.value(NativeLensThemeMode.light);
+  }
+
+  @override
   Future<NetworkCapability> getNetworkCapability() {
     return Future<NetworkCapability>.value(
       const NetworkCapability(
@@ -568,6 +578,28 @@ void main() {
     expect(powerState.batteryLevel, 89);
     expect(powerState.isCharging, true);
     expect(powerState.chargingSource, 'USB');
+  });
+
+  test('getThemeMode', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensThemeMode themeMode = await nativeLensPlugin.getThemeMode();
+
+    expect(themeMode, NativeLensThemeMode.dark);
+  });
+
+  test('watchThemeMode', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    MockNativeLensPlatform fakePlatform = MockNativeLensPlatform();
+    NativeLensPlatform.instance = fakePlatform;
+
+    final NativeLensThemeMode themeMode = await nativeLensPlugin
+        .watchThemeMode()
+        .first;
+
+    expect(themeMode, NativeLensThemeMode.light);
   });
 
   test('getNetworkCapability', () async {
