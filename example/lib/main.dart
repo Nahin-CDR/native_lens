@@ -30,6 +30,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   NetworkSpeedSample? _networkSpeedSample;
   CompatibilitySummary? _compatibilitySummary;
   DeviceOrientationInfo? _deviceOrientation;
+  NativeLensThemeMode? _themeMode;
+  NativeLensThemeMode? _liveThemeMode;
   NativeLensTask _selectedTask = NativeLensTask.videoUpload;
   NativeTaskRiskResult? _taskRiskResult;
   NativeLensCustomTaskResult? _customTaskResult;
@@ -39,11 +41,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   StreamSubscription<NetworkSpeedSample>? _networkSpeedSubscription;
   StreamSubscription<DeviceOrientationInfo>? _deviceOrientationSubscription;
   StreamSubscription<PowerState>? _powerStateSubscription;
+  StreamSubscription<NativeLensThemeMode>? _themeModeSubscription;
   bool _isGeneratingReport = false;
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
   bool _isAnalyzingCustomTask = false;
   bool _isAnalyzingPresetTask = false;
+  bool _isLoadingThemeMode = false;
   bool _customRequiresCamera = true;
   bool _customRequiresMicrophone = false;
   bool _customRequiresStableNetwork = false;
@@ -51,6 +55,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   String? _taskRiskErrorMessage;
   String? _customTaskErrorMessage;
   String? _presetTaskErrorMessage;
+  String? _themeModeErrorMessage;
 
   @override
   void initState() {
@@ -61,6 +66,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     listenToNetworkCapability();
     listenToNetworkSpeed();
     listenToDeviceOrientation();
+    listenToThemeMode();
+    refreshThemeMode();
   }
 
   @override
@@ -71,6 +78,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _networkCapabilitySubscription?.cancel();
     _networkSpeedSubscription?.cancel();
     _deviceOrientationSubscription?.cancel();
+    _themeModeSubscription?.cancel();
     super.dispose();
   }
 
@@ -78,6 +86,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       refreshPowerState();
+      refreshThemeMode();
     }
   }
 
@@ -146,6 +155,32 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> refreshThemeMode() async {
+    setState(() {
+      _isLoadingThemeMode = true;
+      _themeModeErrorMessage = null;
+    });
+
+    NativeLensThemeMode? themeMode;
+    String? errorMessage;
+
+    try {
+      themeMode = await _nativeLensPlugin.getThemeMode();
+    } on PlatformException {
+      errorMessage = 'Failed to read native theme mode.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _themeMode = themeMode;
+      _isLoadingThemeMode = false;
+      _themeModeErrorMessage = errorMessage;
+    });
+  }
+
   void listenToPowerState() {
     _powerStateSubscription = _nativeLensPlugin.watchPowerState().listen(
       (PowerState powerState) {
@@ -158,6 +193,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       onError: (Object error) {
         // The startup snapshot and lifecycle refresh still provide a safe
         // fallback if the stream is unavailable in a test or unsupported host.
+      },
+    );
+  }
+
+  void listenToThemeMode() {
+    _themeModeSubscription = _nativeLensPlugin.watchThemeMode().listen(
+      (NativeLensThemeMode themeMode) {
+        if (!mounted) return;
+
+        setState(() {
+          _liveThemeMode = themeMode;
+        });
+      },
+      onError: (Object error) {
+        // The snapshot button still provides a safe fallback if live theme
+        // updates are unavailable on an unsupported host.
       },
     );
   }
@@ -514,6 +565,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
           const SizedBox(height: 16),
 
+          _themeModeSection(),
+
+          const SizedBox(height: 16),
+
           _sectionCard(
             title: 'Orientation',
             child: Column(
@@ -640,6 +695,62 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     final double kiloBytesPerSecond = bytesPerSecond / 1024;
     return '${kiloBytesPerSecond.toStringAsFixed(2)} KB/s';
+  }
+
+  Widget _themeModeSection() {
+    return _sectionCard(
+      title: 'Theme Mode Intelligence',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _SummaryRow(
+            label: 'Current Theme',
+            value: _themeModeLabel(_themeMode),
+          ),
+          _SummaryRow(
+            label: 'Live Theme',
+            value: _themeModeLabel(_liveThemeMode, waitingLabel: 'Waiting'),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _isLoadingThemeMode ? null : refreshThemeMode,
+            icon: _isLoadingThemeMode
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.brightness_6_rounded),
+            label: Text(_isLoadingThemeMode ? 'Reading...' : 'Get Theme Mode'),
+          ),
+          if (_themeModeErrorMessage != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _themeModeErrorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _themeModeLabel(
+    NativeLensThemeMode? themeMode, {
+    String waitingLabel = 'Unknown',
+  }) {
+    if (themeMode == null) {
+      return waitingLabel;
+    }
+
+    switch (themeMode) {
+      case NativeLensThemeMode.light:
+        return 'Light';
+      case NativeLensThemeMode.dark:
+        return 'Dark';
+      case NativeLensThemeMode.unknown:
+        return 'Unknown';
+    }
   }
 
   Widget _datasetExportSection() {
