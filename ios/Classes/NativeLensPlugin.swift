@@ -25,6 +25,20 @@ private final class EventChannelHandler: NSObject, FlutterStreamHandler {
   }
 }
 
+private final class ThemeModeObserverView: UIView {
+  var onThemeModeChanged: ((UITraitCollection) -> Void)?
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+
+    if previousTraitCollection?.userInterfaceStyle == traitCollection.userInterfaceStyle {
+      return
+    }
+
+    onThemeModeChanged?(traitCollection)
+  }
+}
+
 public class NativeLensPlugin: NSObject, FlutterPlugin {
   private var networkMonitor: NWPathMonitor?
   private var networkCapabilitySink: FlutterEventSink?
@@ -32,11 +46,18 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
   private var orientationObserver: NSObjectProtocol?
   private var networkSpeedSink: FlutterEventSink?
   private var powerStateSink: FlutterEventSink?
+  private var themeModeSink: FlutterEventSink?
+  private var themeModeObserverView: ThemeModeObserverView?
+  private var lastThemeMode: String?
   private var batteryLevelObserver: NSObjectProtocol?
   private var batteryStateObserver: NSObjectProtocol?
   private var lowPowerModeObserver: NSObjectProtocol?
   private var wasBatteryMonitoringEnabled = false
   private let monitorQueue = DispatchQueue(label: "native_lens.network_monitor")
+
+  deinit {
+    stopThemeModeStream()
+  }
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "native_lens", binaryMessenger: registrar.messenger())
@@ -87,6 +108,17 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
         onCancel: { _ in instance.stopPowerStateStream() }
       )
     )
+
+    let themeModeChannel = FlutterEventChannel(
+      name: "native_lens/theme_mode",
+      binaryMessenger: registrar.messenger()
+    )
+    themeModeChannel.setStreamHandler(
+      EventChannelHandler(
+        onListen: { _, events in instance.startThemeModeStream(events) },
+        onCancel: { _ in instance.stopThemeModeStream() }
+      )
+    )
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -105,6 +137,8 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
       result(getCameraCapabilities())
     case "getPowerState":
       result(getPowerState())
+    case "getThemeMode":
+      result(getThemeMode())
     case "getNetworkCapability":
       result(getNetworkCapability())
     case "getDeviceOrientation":
@@ -401,6 +435,84 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
 
   private func emitPowerStateUpdate() {
     powerStateSink?(createPowerState())
+  }
+
+  private func getThemeMode() -> String {
+    guard let traitCollection = activeTraitCollection() else {
+      return "unknown"
+    }
+
+    return themeMode(from: traitCollection.userInterfaceStyle)
+  }
+
+  private func activeTraitCollection() -> UITraitCollection? {
+    return activeRootView()?.traitCollection
+  }
+
+  private func activeRootView() -> UIView? {
+    let activeWindow: UIWindow?
+
+    if #available(iOS 13.0, *) {
+      activeWindow = UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .flatMap { $0.windows }
+        .first { $0.isKeyWindow }
+    } else {
+      activeWindow = UIApplication.shared.keyWindow
+    }
+
+    return activeWindow?.rootViewController?.view ?? activeWindow
+  }
+
+  private func themeMode(from style: UIUserInterfaceStyle) -> String {
+    switch style {
+    case .dark:
+      return "dark"
+    case .light:
+      return "light"
+    default:
+      return "unknown"
+    }
+  }
+
+  private func startThemeModeStream(_ events: @escaping FlutterEventSink) {
+    stopThemeModeStream()
+    themeModeSink = events
+    lastThemeMode = getThemeMode()
+    events(lastThemeMode ?? "unknown")
+
+    guard let rootView = activeRootView() else {
+      return
+    }
+
+    let observerView = ThemeModeObserverView(frame: .zero)
+    observerView.isHidden = true
+    observerView.isUserInteractionEnabled = false
+    observerView.onThemeModeChanged = { [weak self] traitCollection in
+      self?.emitThemeModeIfChanged(
+        self?.themeMode(from: traitCollection.userInterfaceStyle) ?? "unknown"
+      )
+    }
+
+    rootView.addSubview(observerView)
+    themeModeObserverView = observerView
+  }
+
+  private func stopThemeModeStream() {
+    themeModeObserverView?.removeFromSuperview()
+    themeModeObserverView?.onThemeModeChanged = nil
+    themeModeObserverView = nil
+    themeModeSink = nil
+    lastThemeMode = nil
+  }
+
+  private func emitThemeModeIfChanged(_ themeMode: String) {
+    if themeMode == lastThemeMode {
+      return
+    }
+
+    lastThemeMode = themeMode
+    themeModeSink?(themeMode)
   }
 
   private func createDeviceOrientation(
