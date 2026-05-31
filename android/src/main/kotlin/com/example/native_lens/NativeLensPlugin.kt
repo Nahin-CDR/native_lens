@@ -2,10 +2,12 @@ package com.example.native_lens
 
 import android.content.Context
 import android.content.BroadcastReceiver
+import android.content.ComponentCallbacks
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -49,6 +51,7 @@ class NativeLensPlugin :
     private lateinit var networkCapabilityChannel: EventChannel
     private lateinit var deviceOrientationChannel: EventChannel
     private lateinit var powerStateChannel: EventChannel
+    private lateinit var themeModeChannel: EventChannel
     private lateinit var applicationContext: Context
     private lateinit var packageManager: PackageManager
     private lateinit var cameraManager: CameraManager
@@ -57,13 +60,17 @@ class NativeLensPlugin :
     private lateinit var sensorManager: SensorManager
     private lateinit var windowManager: WindowManager
     private val networkSpeedHandler = Handler(Looper.getMainLooper())
+    private val themeModeHandler = Handler(Looper.getMainLooper())
     private var networkSpeedEvents: EventChannel.EventSink? = null
     private var networkCapabilityEvents: EventChannel.EventSink? = null
     private var deviceOrientationEvents: EventChannel.EventSink? = null
     private var powerStateEvents: EventChannel.EventSink? = null
+    private var themeModeEvents: EventChannel.EventSink? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var powerStateReceiver: BroadcastReceiver? = null
     private var orientationEventListener: OrientationEventListener? = null
+    private var themeModeCallbacks: ComponentCallbacks? = null
+    private var lastThemeMode: String? = null
     private var previousRxBytes = 0L
     private var previousTxBytes = 0L
     private var previousSpeedSampleTimeMillis = 0L
@@ -143,6 +150,22 @@ class NativeLensPlugin :
                 }
             }
         )
+        themeModeChannel =
+            EventChannel(flutterPluginBinding.binaryMessenger, "native_lens/theme_mode")
+        themeModeChannel.setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(
+                    arguments: Any?,
+                    events: EventChannel.EventSink
+                ) {
+                    startThemeModeStream(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopThemeModeStream()
+                }
+            }
+        )
         applicationContext = flutterPluginBinding.applicationContext
         packageManager = applicationContext.packageManager
         cameraManager =
@@ -170,6 +193,7 @@ class NativeLensPlugin :
             "getMediaCodecs" -> result.success(getMediaCodecs())
             "getCameraCapabilities" -> result.success(getCameraCapabilities())
             "getPowerState" -> result.success(getPowerState())
+            "getThemeMode" -> result.success(getThemeMode())
             "getNetworkCapability" -> result.success(getNetworkCapability())
             "getDeviceOrientation" -> result.success(getDeviceOrientation())
             else -> result.notImplemented()
@@ -737,6 +761,77 @@ class NativeLensPlugin :
         }
     }
 
+    private fun getThemeMode(): String {
+        return getThemeModeFromUiMode(applicationContext.resources.configuration.uiMode)
+    }
+
+    private fun getThemeModeFromUiMode(uiMode: Int): String {
+        return when (uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+            Configuration.UI_MODE_NIGHT_YES -> "dark"
+            Configuration.UI_MODE_NIGHT_NO -> "light"
+            else -> "unknown"
+        }
+    }
+
+    private fun startThemeModeStream(events: EventChannel.EventSink) {
+        stopThemeModeStream()
+        themeModeEvents = events
+        lastThemeMode = getThemeMode()
+        emitThemeModeUpdate(lastThemeMode ?: "unknown")
+
+        val callbacks =
+            object : ComponentCallbacks {
+                override fun onConfigurationChanged(newConfig: Configuration) {
+                    val themeMode = getThemeModeFromUiMode(newConfig.uiMode)
+
+                    if (themeMode == lastThemeMode) {
+                        return
+                    }
+
+                    lastThemeMode = themeMode
+                    emitThemeModeUpdate(themeMode)
+                }
+
+                override fun onLowMemory() {
+                    // Theme mode streaming does not allocate memory that needs trimming.
+                }
+            }
+
+        themeModeCallbacks = callbacks
+
+        try {
+            applicationContext.registerComponentCallbacks(callbacks)
+        } catch (exception: RuntimeException) {
+            themeModeCallbacks = null
+        }
+    }
+
+    private fun stopThemeModeStream() {
+        val callbacks = themeModeCallbacks
+
+        if (callbacks != null) {
+            try {
+                applicationContext.unregisterComponentCallbacks(callbacks)
+            } catch (exception: RuntimeException) {
+                // The callbacks may already be unregistered while the engine is detaching.
+            }
+        }
+
+        themeModeCallbacks = null
+        themeModeEvents = null
+        lastThemeMode = null
+    }
+
+    private fun emitThemeModeUpdate(themeMode: String) {
+        if (themeModeEvents == null) {
+            return
+        }
+
+        themeModeHandler.post {
+            themeModeEvents?.success(themeMode)
+        }
+    }
+
     private fun getBatteryIntent(): Intent? {
         return applicationContext.registerReceiver(
             null,
@@ -1156,10 +1251,12 @@ class NativeLensPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopPowerStateStream()
+        stopThemeModeStream()
         stopNetworkCapabilityStream()
         stopNetworkSpeedStream()
         stopDeviceOrientationStream()
         powerStateChannel.setStreamHandler(null)
+        themeModeChannel.setStreamHandler(null)
         networkCapabilityChannel.setStreamHandler(null)
         networkSpeedChannel.setStreamHandler(null)
         deviceOrientationChannel.setStreamHandler(null)
