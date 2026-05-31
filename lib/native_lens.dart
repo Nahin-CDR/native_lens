@@ -31,6 +31,7 @@ export 'native_lens_dataset_row.dart';
 export 'native_lens_preset.dart';
 export 'native_lens_task.dart';
 export 'native_lens_task_requirements.dart';
+export 'native_lens_theme_mode.dart';
 export 'native_sensor.dart';
 export 'native_lens_report.dart';
 export 'native_task_risk_result.dart';
