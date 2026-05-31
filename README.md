@@ -331,6 +331,34 @@ Available presets:
 
 Presets reuse the same Custom Task Requirements engine internally.
 
+### Theme Mode Intelligence
+
+NativeLens can read the native system theme mode and listen for changes when an
+app wants to sync its theme with the device.
+
+```dart
+final themeMode = await NativeLens().getThemeMode();
+
+print(themeMode);
+```
+
+Use the live stream to react when the user changes the system theme:
+
+```dart
+NativeLens().watchThemeMode().listen((themeMode) {
+  print(themeMode);
+});
+```
+
+Possible values are:
+
+- `NativeLensThemeMode.light`
+- `NativeLensThemeMode.dark`
+- `NativeLensThemeMode.unknown`
+
+`unknown` is returned as a safe fallback when the platform cannot determine the
+active native theme mode.
+
 ### Dataset Pipeline
 
 Generate a stable dataset row from the current NativeLens report and

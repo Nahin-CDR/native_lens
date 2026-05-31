@@ -1,3 +1,10 @@
+## 0.10.0 - Unreleased
+
+- Added native theme mode detection.
+- Added real-time theme mode stream.
+- Added Android and iOS support for theme mode intelligence.
+- Added example app Theme Mode Intelligence section.
+
 ## 0.9.0
 
 - Added `NativeLensPreset` enum.
