@@ -32,6 +32,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local planning files
+plan/
+
 # NativeLens ML generated artifacts
 ml/models/*.joblib
 ml/dataset/real_*.csv
