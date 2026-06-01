@@ -1,4 +1,4 @@
-## 0.11.0 - Unreleased
+## 0.11.0
 
 - Added Smart Feature Intelligence.
 - Added `analyzeFeature()`.
