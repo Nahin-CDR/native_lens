@@ -6,6 +6,8 @@ import 'display_info.dart';
 import 'media_codec_capability.dart';
 import 'native_lens_custom_task_result.dart';
 import 'native_lens_dataset_row.dart';
+import 'native_lens_feature.dart';
+import 'native_lens_feature_options.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_lens_report.dart';
 import 'native_sensor.dart';
@@ -17,6 +19,7 @@ import 'network_capability.dart';
 import 'network_speed_sample.dart';
 import 'platform_summary.dart';
 import 'power_state.dart';
+import 'src/feature_mapping.dart';
 import 'src/preset_task_mapping.dart';
 import 'system_feature.dart';
 import 'device_orientation_info.dart';
@@ -381,6 +384,17 @@ class NativeLens {
     return analyzeCustomTask(
       taskName: nativeLensPresetDisplayName(preset),
       requirements: nativeLensPresetRequirements(preset),
+    );
+  }
+
+  /// Analyzes a smart feature using the custom task rule engine.
+  Future<NativeLensCustomTaskResult> analyzeFeature(
+    NativeLensFeature feature, {
+    NativeLensFeatureOptions options = const NativeLensFeatureOptions(),
+  }) {
+    return analyzeCustomTask(
+      taskName: nativeLensFeatureDisplayName(feature),
+      requirements: nativeLensFeatureRequirements(feature, options: options),
     );
   }
 

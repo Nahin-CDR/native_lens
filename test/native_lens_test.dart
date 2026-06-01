@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:native_lens/native_lens.dart';
 import 'package:native_lens/native_lens_platform_interface.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
+import 'package:native_lens/src/feature_mapping.dart';
 import 'package:native_lens/src/preset_task_mapping.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -943,6 +944,77 @@ void main() {
       contains('Camera capability is available.'),
     );
     expect(result.analyzedAtMillis, greaterThanOrEqualTo(beforeAnalysis));
+  });
+
+  test('analyzeFeature matches equivalent custom task analysis', () async {
+    for (final NativeLensFeature feature in NativeLensFeature.values) {
+      NativeLensPlatform.instance = MockNativeLensPlatform();
+      final NativeLens nativeLensPlugin = NativeLens();
+
+      final NativeLensCustomTaskResult featureResult = await nativeLensPlugin
+          .analyzeFeature(feature);
+
+      NativeLensPlatform.instance = MockNativeLensPlatform();
+      final NativeLensCustomTaskResult customResult = await nativeLensPlugin
+          .analyzeCustomTask(
+            taskName: nativeLensFeatureDisplayName(feature),
+            requirements: nativeLensFeatureRequirements(feature),
+          );
+
+      expect(featureResult, isA<NativeLensCustomTaskResult>());
+      expect(featureResult.taskName, nativeLensFeatureDisplayName(feature));
+      expect(
+        stableCustomTaskResultFields(featureResult),
+        stableCustomTaskResultFields(customResult),
+      );
+    }
+  });
+
+  test('analyzeFeature faceFilterCamera uses mapped requirements', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    NativeLensPlatform.instance = MockNativeLensPlatform();
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeFeature(NativeLensFeature.faceFilterCamera);
+
+    expect(result.taskName, 'Face Filter Camera');
+    expect(result.riskLevel, 'high');
+    expect(result.canContinue, isFalse);
+    expect(result.requiredCapabilities, contains('camera capability'));
+    expect(result.requiredCapabilities, contains('gyroscope sensor'));
+    expect(result.requiredCapabilities, contains('accelerometer sensor'));
+    expect(result.requiredCapabilities, contains('battery level >= 20%'));
+    expect(result.requiredCapabilities, contains('refresh rate >= 60Hz'));
+    expect(result.availableCapabilities, contains('camera capability'));
+    expect(result.availableCapabilities, contains('accelerometer sensor'));
+    expect(result.missingCapabilities, contains('gyroscope sensor'));
+  });
+
+  test('analyzeFeature options affect result through mapping', () async {
+    NativeLens nativeLensPlugin = NativeLens();
+    NativeLensPlatform.instance = MockNativeLensPlatform();
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeFeature(
+          NativeLensFeature.videoUpload,
+          options: const NativeLensFeatureOptions(
+            minBatteryLevel: 95,
+            preferUnmeteredNetwork: true,
+            disallowPowerSaveMode: true,
+          ),
+        );
+
+    expect(result.taskName, 'Video Upload');
+    expect(result.riskLevel, 'medium');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('stable network'));
+    expect(result.requiredCapabilities, contains('unmetered network'));
+    expect(result.requiredCapabilities, contains('power saver disabled'));
+    expect(result.requiredCapabilities, contains('battery level >= 95%'));
+    expect(result.availableCapabilities, contains('stable network'));
+    expect(result.availableCapabilities, contains('unmetered network'));
+    expect(result.availableCapabilities, contains('power saver disabled'));
+    expect(result.missingCapabilities, contains('battery level >= 95%'));
   });
 
   test('analyzePresetTask matches equivalent custom task analysis', () async {
