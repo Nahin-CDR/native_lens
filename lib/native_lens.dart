@@ -29,6 +29,8 @@ export 'media_codec_capability.dart';
 export 'native_lens_custom_task_result.dart';
 export 'native_lens_dataset_exporter.dart';
 export 'native_lens_dataset_row.dart';
+export 'native_lens_feature.dart';
+export 'native_lens_feature_options.dart';
 export 'native_lens_preset.dart';
 export 'native_lens_task.dart';
 export 'native_lens_task_requirements.dart';
