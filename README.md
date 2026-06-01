@@ -273,6 +273,50 @@ an ML model file. NativeLens uses native device signals and explainable
 rule-based intelligence, and it does not claim CPU, GPU, or chip-level
 detection unless reliable platform APIs expose that data.
 
+### Smart Feature Intelligence
+
+NativeLens can analyze common feature flows without requiring developers to
+manually build `NativeLensTaskRequirements`. Select a `NativeLensFeature`, and
+NativeLens builds the underlying requirements internally before reusing the
+same custom task rule engine.
+
+```dart
+final result = await NativeLens().analyzeFeature(
+  NativeLensFeature.faceFilterCamera,
+);
+```
+
+For more specific feature intent, pass `NativeLensFeatureOptions`.
+
+```dart
+final result = await NativeLens().analyzeFeature(
+  NativeLensFeature.liveStreaming,
+  options: const NativeLensFeatureOptions(
+    realtime: true,
+    highPerformance: true,
+    minBatteryLevel: 25,
+    preferUnmeteredNetwork: true,
+    disallowPowerSaveMode: true,
+  ),
+);
+```
+
+Available smart features:
+
+- `liveStreaming`
+- `videoUpload`
+- `faceFilterCamera`
+- `cameraRecording`
+- `backgroundSync`
+- `arExperience`
+- `stepTracking`
+- `compassNavigation`
+- `mediaProcessing`
+
+Existing APIs remain supported. Use `analyzeCustomTask()` when you need full
+manual control over requirements, and use `analyzePresetTask()` if you already
+depend on preset feature preflight checks.
+
 ### Custom Task Requirements
 
 NativeLens can analyze whether a device is ready for a developer-defined custom

@@ -1,3 +1,12 @@
+## 0.11.0 - Unreleased
+
+- Added Smart Feature Intelligence.
+- Added `analyzeFeature()`.
+- Added `NativeLensFeature`.
+- Added `NativeLensFeatureOptions`.
+- Added internal smart feature requirement mapping.
+- Added Smart Feature Intelligence section to the example app.
+
 ## 0.10.0
 
 - Added native theme mode detection.
