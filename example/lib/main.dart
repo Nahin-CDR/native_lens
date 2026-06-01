@@ -19,6 +19,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _nativeLensPlugin = NativeLens();
   final TextEditingController _customMinBatteryController =
       TextEditingController(text: '20');
+  final TextEditingController _featureMinBatteryController =
+      TextEditingController(text: '20');
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
   List<NativeSensor>? _sensors;
@@ -34,6 +36,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   NativeLensThemeMode? _liveThemeMode;
   NativeLensTask _selectedTask = NativeLensTask.videoUpload;
   NativeTaskRiskResult? _taskRiskResult;
+  NativeLensFeature _selectedFeature = NativeLensFeature.faceFilterCamera;
+  NativeLensCustomTaskResult? _smartFeatureResult;
   NativeLensCustomTaskResult? _customTaskResult;
   NativeLensPreset _selectedPreset = NativeLensPreset.liveStreaming;
   NativeLensCustomTaskResult? _presetTaskResult;
@@ -45,14 +49,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _isGeneratingReport = false;
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
+  bool _isAnalyzingSmartFeature = false;
   bool _isAnalyzingCustomTask = false;
   bool _isAnalyzingPresetTask = false;
   bool _isLoadingThemeMode = false;
+  bool _featureRealtime = false;
+  bool _featureHighPerformance = false;
+  bool _featurePreferUnmeteredNetwork = false;
+  bool _featureDisallowPowerSaveMode = false;
   bool _customRequiresCamera = true;
   bool _customRequiresMicrophone = false;
   bool _customRequiresStableNetwork = false;
   String? _errorMessage;
   String? _taskRiskErrorMessage;
+  String? _smartFeatureErrorMessage;
   String? _customTaskErrorMessage;
   String? _presetTaskErrorMessage;
   String? _themeModeErrorMessage;
@@ -73,6 +83,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _featureMinBatteryController.dispose();
     _customMinBatteryController.dispose();
     _powerStateSubscription?.cancel();
     _networkCapabilitySubscription?.cancel();
@@ -384,6 +395,46 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> analyzeSmartFeature() async {
+    setState(() {
+      _isAnalyzingSmartFeature = true;
+      _smartFeatureErrorMessage = null;
+    });
+
+    NativeLensCustomTaskResult? result;
+    String? errorMessage;
+    final int? minBatteryLevel = int.tryParse(
+      _featureMinBatteryController.text.trim(),
+    );
+
+    try {
+      result = await _nativeLensPlugin.analyzeFeature(
+        _selectedFeature,
+        options: NativeLensFeatureOptions(
+          realtime: _featureRealtime,
+          highPerformance: _featureHighPerformance,
+          minBatteryLevel: minBatteryLevel,
+          preferUnmeteredNetwork: _featurePreferUnmeteredNetwork,
+          disallowPowerSaveMode: _featureDisallowPowerSaveMode,
+        ),
+      );
+    } on PlatformException {
+      errorMessage = 'Failed to analyze smart feature.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    } catch (error) {
+      errorMessage = 'Failed to analyze smart feature: $error';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _smartFeatureResult = result;
+      _isAnalyzingSmartFeature = false;
+      _smartFeatureErrorMessage = errorMessage;
+    });
+  }
+
   Future<void> analyzePresetFeature() async {
     setState(() {
       _isAnalyzingPresetTask = true;
@@ -558,6 +609,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           const SizedBox(height: 16),
 
           _taskRiskAnalysisSection(),
+
+          const SizedBox(height: 16),
+
+          _smartFeatureIntelligenceSection(),
 
           const SizedBox(height: 16),
 
@@ -905,6 +960,128 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 
+  Widget _smartFeatureIntelligenceSection() {
+    final NativeLensCustomTaskResult? result = _smartFeatureResult;
+
+    return _sectionCard(
+      title: 'Smart Feature Intelligence',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          DropdownButtonFormField<NativeLensFeature>(
+            initialValue: _selectedFeature,
+            decoration: const InputDecoration(
+              labelText: 'Feature',
+              border: OutlineInputBorder(),
+            ),
+            items: NativeLensFeature.values
+                .map(
+                  (NativeLensFeature feature) =>
+                      DropdownMenuItem<NativeLensFeature>(
+                        value: feature,
+                        child: Text(_featureLabel(feature)),
+                      ),
+                )
+                .toList(),
+            onChanged: _isAnalyzingSmartFeature
+                ? null
+                : (NativeLensFeature? feature) {
+                    if (feature == null) return;
+
+                    setState(() {
+                      _selectedFeature = feature;
+                    });
+                  },
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Realtime'),
+            value: _featureRealtime,
+            onChanged: _isAnalyzingSmartFeature
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _featureRealtime = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('High performance'),
+            value: _featureHighPerformance,
+            onChanged: _isAnalyzingSmartFeature
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _featureHighPerformance = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Prefer unmetered network'),
+            value: _featurePreferUnmeteredNetwork,
+            onChanged: _isAnalyzingSmartFeature
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _featurePreferUnmeteredNetwork = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Disallow power save mode'),
+            value: _featureDisallowPowerSaveMode,
+            onChanged: _isAnalyzingSmartFeature
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _featureDisallowPowerSaveMode = value;
+                    });
+                  },
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _featureMinBatteryController,
+            enabled: !_isAnalyzingSmartFeature,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Minimum battery level',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _isAnalyzingSmartFeature ? null : analyzeSmartFeature,
+            icon: _isAnalyzingSmartFeature
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.auto_awesome_rounded),
+            label: Text(
+              _isAnalyzingSmartFeature ? 'Analyzing...' : 'Analyze Feature',
+            ),
+          ),
+          if (_smartFeatureErrorMessage != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _smartFeatureErrorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (result != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _customTaskResultPanel(result),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _customTaskRequirementsSection() {
     final NativeLensCustomTaskResult? result = _customTaskResult;
     final NativeLensCustomTaskResult? presetResult = _presetTaskResult;
@@ -1141,6 +1318,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return 'Step Tracking';
       case NativeLensTask.compassNavigation:
         return 'Compass Navigation';
+    }
+  }
+
+  String _featureLabel(NativeLensFeature feature) {
+    switch (feature) {
+      case NativeLensFeature.liveStreaming:
+        return 'Live Streaming';
+      case NativeLensFeature.videoUpload:
+        return 'Video Upload';
+      case NativeLensFeature.faceFilterCamera:
+        return 'Face Filter Camera';
+      case NativeLensFeature.cameraRecording:
+        return 'Camera Recording';
+      case NativeLensFeature.backgroundSync:
+        return 'Background Sync';
+      case NativeLensFeature.arExperience:
+        return 'AR Experience';
+      case NativeLensFeature.stepTracking:
+        return 'Step Tracking';
+      case NativeLensFeature.compassNavigation:
+        return 'Compass Navigation';
+      case NativeLensFeature.mediaProcessing:
+        return 'Media Processing';
     }
   }
 
