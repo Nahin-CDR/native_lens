@@ -21,6 +21,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       TextEditingController(text: '20');
   final TextEditingController _featureMinBatteryController =
       TextEditingController(text: '20');
+  final TextEditingController _streamingMinBatteryController =
+      TextEditingController(text: '15');
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
   List<NativeSensor>? _sensors;
@@ -38,6 +40,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   NativeTaskRiskResult? _taskRiskResult;
   NativeLensFeature _selectedFeature = NativeLensFeature.faceFilterCamera;
   NativeLensCustomTaskResult? _smartFeatureResult;
+  NativeLensCustomTaskResult? _streamingReadinessResult;
   NativeLensCustomTaskResult? _customTaskResult;
   NativeLensPreset _selectedPreset = NativeLensPreset.liveStreaming;
   NativeLensCustomTaskResult? _presetTaskResult;
@@ -50,6 +53,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _isAnalyzingCompatibility = false;
   bool _isAnalyzingTaskRisk = false;
   bool _isAnalyzingSmartFeature = false;
+  bool _isAnalyzingStreamingReadiness = false;
   bool _isAnalyzingCustomTask = false;
   bool _isAnalyzingPresetTask = false;
   bool _isLoadingThemeMode = false;
@@ -57,12 +61,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _featureHighPerformance = false;
   bool _featurePreferUnmeteredNetwork = false;
   bool _featureDisallowPowerSaveMode = false;
+  bool _streamingRealtime = false;
+  bool _streamingHighPerformance = false;
+  bool _streamingPreferUnmeteredNetwork = false;
+  bool _streamingDisallowPowerSaveMode = false;
   bool _customRequiresCamera = true;
   bool _customRequiresMicrophone = false;
   bool _customRequiresStableNetwork = false;
   String? _errorMessage;
   String? _taskRiskErrorMessage;
   String? _smartFeatureErrorMessage;
+  String? _streamingReadinessErrorMessage;
   String? _customTaskErrorMessage;
   String? _presetTaskErrorMessage;
   String? _themeModeErrorMessage;
@@ -83,6 +92,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _streamingMinBatteryController.dispose();
     _featureMinBatteryController.dispose();
     _customMinBatteryController.dispose();
     _powerStateSubscription?.cancel();
@@ -435,6 +445,45 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> analyzeStreamingReadiness() async {
+    setState(() {
+      _isAnalyzingStreamingReadiness = true;
+      _streamingReadinessErrorMessage = null;
+    });
+
+    NativeLensCustomTaskResult? result;
+    String? errorMessage;
+    final int? minBatteryLevel = int.tryParse(
+      _streamingMinBatteryController.text.trim(),
+    );
+
+    try {
+      result = await _nativeLensPlugin.analyzeStreamingReadiness(
+        options: NativeLensFeatureOptions(
+          realtime: _streamingRealtime,
+          highPerformance: _streamingHighPerformance,
+          minBatteryLevel: minBatteryLevel,
+          preferUnmeteredNetwork: _streamingPreferUnmeteredNetwork,
+          disallowPowerSaveMode: _streamingDisallowPowerSaveMode,
+        ),
+      );
+    } on PlatformException {
+      errorMessage = 'Failed to analyze streaming readiness.';
+    } on MissingPluginException {
+      errorMessage = 'NativeLens is not available on this platform.';
+    } catch (error) {
+      errorMessage = 'Failed to analyze streaming readiness: $error';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _streamingReadinessResult = result;
+      _isAnalyzingStreamingReadiness = false;
+      _streamingReadinessErrorMessage = errorMessage;
+    });
+  }
+
   Future<void> analyzePresetFeature() async {
     setState(() {
       _isAnalyzingPresetTask = true;
@@ -613,6 +662,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           const SizedBox(height: 16),
 
           _smartFeatureIntelligenceSection(),
+
+          const SizedBox(height: 16),
+
+          _streamingReadinessIntelligenceSection(),
 
           const SizedBox(height: 16),
 
@@ -1070,6 +1123,108 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             const SizedBox(height: 12),
             Text(
               _smartFeatureErrorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (result != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _customTaskResultPanel(result),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _streamingReadinessIntelligenceSection() {
+    final NativeLensCustomTaskResult? result = _streamingReadinessResult;
+
+    return _sectionCard(
+      title: 'Streaming Readiness Intelligence',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text('Checks current device/network readiness for streaming.'),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Realtime'),
+            value: _streamingRealtime,
+            onChanged: _isAnalyzingStreamingReadiness
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _streamingRealtime = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('High performance'),
+            value: _streamingHighPerformance,
+            onChanged: _isAnalyzingStreamingReadiness
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _streamingHighPerformance = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Prefer unmetered network'),
+            value: _streamingPreferUnmeteredNetwork,
+            onChanged: _isAnalyzingStreamingReadiness
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _streamingPreferUnmeteredNetwork = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Disallow power save mode'),
+            value: _streamingDisallowPowerSaveMode,
+            onChanged: _isAnalyzingStreamingReadiness
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _streamingDisallowPowerSaveMode = value;
+                    });
+                  },
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _streamingMinBatteryController,
+            enabled: !_isAnalyzingStreamingReadiness,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Minimum battery level',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _isAnalyzingStreamingReadiness
+                ? null
+                : analyzeStreamingReadiness,
+            icon: _isAnalyzingStreamingReadiness
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.live_tv_rounded),
+            label: Text(
+              _isAnalyzingStreamingReadiness
+                  ? 'Analyzing...'
+                  : 'Analyze Streaming Readiness',
+            ),
+          ),
+          if (_streamingReadinessErrorMessage != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _streamingReadinessErrorMessage!,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
