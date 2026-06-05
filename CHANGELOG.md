@@ -1,3 +1,10 @@
+## 0.12.0 - Unreleased
+
+- Added Streaming Readiness Intelligence.
+- Added `analyzeStreamingReadiness()`.
+- Added device/network readiness check for streaming preflight.
+- Added Streaming Readiness Intelligence section to the example app.
+
 ## 0.11.0
 
 - Added Smart Feature Intelligence.

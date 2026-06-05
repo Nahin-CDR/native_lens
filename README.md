@@ -317,6 +317,41 @@ Existing APIs remain supported. Use `analyzeCustomTask()` when you need full
 manual control over requirements, and use `analyzePresetTask()` if you already
 depend on preset feature preflight checks.
 
+### Streaming Readiness Intelligence
+
+NativeLens can check current device/network readiness before starting a
+streaming feature. Use `analyzeStreamingReadiness()` when you want a focused
+preflight signal for video playback, live streaming, or adaptive streaming
+without adding a new `NativeLensFeature` enum value.
+
+For stricter streaming intent, pass `NativeLensFeatureOptions`.
+
+```dart
+final result = await NativeLens().analyzeStreamingReadiness(
+  options: const NativeLensFeatureOptions(
+    realtime: true,
+    preferUnmeteredNetwork: true,
+    disallowPowerSaveMode: true,
+  ),
+);
+
+if (result.riskLevel == 'low') {
+  // Start playback normally
+} else if (result.canContinue) {
+  // Warn user or reduce quality
+} else {
+  // Show fallback
+}
+```
+
+Streaming readiness checks device and network signals such as stable network,
+media codec availability, battery level, display refresh rate, metered network
+risk, and power saver mode. The result is a readiness signal, not a playback
+guarantee.
+
+NativeLens does not validate a specific HLS URL, CDN, DRM license, ExoPlayer
+instance, AVPlayer item, or end-to-end playback pipeline.
+
 ### Custom Task Requirements
 
 NativeLens can analyze whether a device is ready for a developer-defined custom
