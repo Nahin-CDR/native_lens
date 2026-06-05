@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:native_lens/native_lens.dart';
 import 'package:native_lens/src/feature_mapping.dart';
 import 'package:native_lens/src/preset_task_mapping.dart';
+import 'package:native_lens/src/streaming_readiness_mapping.dart';
 
 void main() {
   test('NativeLensFeature values exist in stable order', () {
@@ -181,6 +182,67 @@ void main() {
         requiresMediaCodecs: true,
         minBatteryLevel: 25,
         minRefreshRate: 60,
+      ).toMap(),
+    );
+  });
+
+  test('streaming readiness base requirements are stable', () {
+    expect(
+      nativeLensStreamingReadinessRequirements(
+        const NativeLensFeatureOptions(),
+      ).toMap(),
+      const NativeLensTaskRequirements(
+        requiresStableNetwork: true,
+        requiresMediaCodecs: true,
+        minBatteryLevel: 15,
+        minRefreshRate: 30,
+        allowPowerSaveMode: false,
+      ).toMap(),
+    );
+  });
+
+  test('streaming readiness options apply stricter requirements', () {
+    expect(
+      nativeLensStreamingReadinessRequirements(
+        const NativeLensFeatureOptions(minBatteryLevel: 10),
+      ).toMap(),
+      const NativeLensTaskRequirements(
+        requiresStableNetwork: true,
+        requiresMediaCodecs: true,
+        minBatteryLevel: 15,
+        minRefreshRate: 30,
+        allowPowerSaveMode: false,
+      ).toMap(),
+    );
+
+    expect(
+      nativeLensStreamingReadinessRequirements(
+        const NativeLensFeatureOptions(
+          minBatteryLevel: 35,
+          preferUnmeteredNetwork: true,
+          disallowPowerSaveMode: true,
+        ),
+      ).toMap(),
+      const NativeLensTaskRequirements(
+        requiresStableNetwork: true,
+        requiresUnmeteredNetwork: true,
+        requiresMediaCodecs: true,
+        minBatteryLevel: 35,
+        minRefreshRate: 30,
+        allowPowerSaveMode: false,
+      ).toMap(),
+    );
+
+    expect(
+      nativeLensStreamingReadinessRequirements(
+        const NativeLensFeatureOptions(realtime: true, highPerformance: true),
+      ).toMap(),
+      const NativeLensTaskRequirements(
+        requiresStableNetwork: true,
+        requiresMediaCodecs: true,
+        minBatteryLevel: 25,
+        minRefreshRate: 60,
+        allowPowerSaveMode: false,
       ).toMap(),
     );
   });

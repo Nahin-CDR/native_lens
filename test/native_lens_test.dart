@@ -4,6 +4,7 @@ import 'package:native_lens/native_lens_platform_interface.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
 import 'package:native_lens/src/feature_mapping.dart';
 import 'package:native_lens/src/preset_task_mapping.dart';
+import 'package:native_lens/src/streaming_readiness_mapping.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class MockNativeLensPlatform
@@ -1014,6 +1015,79 @@ void main() {
     expect(result.availableCapabilities, contains('stable network'));
     expect(result.availableCapabilities, contains('unmetered network'));
     expect(result.availableCapabilities, contains('power saver disabled'));
+    expect(result.missingCapabilities, contains('battery level >= 95%'));
+  });
+
+  test('analyzeStreamingReadiness delegates through custom engine', () async {
+    NativeLensPlatform.instance = MockNativeLensPlatform();
+    final NativeLens nativeLensPlugin = NativeLens();
+
+    final NativeLensCustomTaskResult streamingResult = await nativeLensPlugin
+        .analyzeStreamingReadiness();
+
+    NativeLensPlatform.instance = MockNativeLensPlatform();
+    final NativeLensCustomTaskResult customResult = await nativeLensPlugin
+        .analyzeCustomTask(
+          taskName: 'Streaming Readiness',
+          requirements: nativeLensStreamingReadinessRequirements(
+            const NativeLensFeatureOptions(),
+          ),
+        );
+
+    expect(streamingResult, isA<NativeLensCustomTaskResult>());
+    expect(streamingResult.taskName, 'Streaming Readiness');
+    expect(
+      stableCustomTaskResultFields(streamingResult),
+      stableCustomTaskResultFields(customResult),
+    );
+    expect(streamingResult.requiredCapabilities, contains('stable network'));
+    expect(
+      streamingResult.requiredCapabilities,
+      contains('media codec capability'),
+    );
+    expect(
+      streamingResult.requiredCapabilities,
+      contains('battery level >= 15%'),
+    );
+    expect(
+      streamingResult.requiredCapabilities,
+      contains('refresh rate >= 30Hz'),
+    );
+    expect(
+      streamingResult.requiredCapabilities,
+      contains('power saver disabled'),
+    );
+  });
+
+  test('analyzeStreamingReadiness applies options through mapping', () async {
+    NativeLensPlatform.instance = MockNativeLensPlatform();
+    final NativeLens nativeLensPlugin = NativeLens();
+
+    final NativeLensCustomTaskResult result = await nativeLensPlugin
+        .analyzeStreamingReadiness(
+          options: const NativeLensFeatureOptions(
+            realtime: true,
+            highPerformance: true,
+            minBatteryLevel: 95,
+            preferUnmeteredNetwork: true,
+            disallowPowerSaveMode: true,
+          ),
+        );
+
+    expect(result.taskName, 'Streaming Readiness');
+    expect(result.riskLevel, 'medium');
+    expect(result.canContinue, isTrue);
+    expect(result.requiredCapabilities, contains('stable network'));
+    expect(result.requiredCapabilities, contains('media codec capability'));
+    expect(result.requiredCapabilities, contains('unmetered network'));
+    expect(result.requiredCapabilities, contains('power saver disabled'));
+    expect(result.requiredCapabilities, contains('battery level >= 95%'));
+    expect(result.requiredCapabilities, contains('refresh rate >= 60Hz'));
+    expect(result.availableCapabilities, contains('stable network'));
+    expect(result.availableCapabilities, contains('media codec capability'));
+    expect(result.availableCapabilities, contains('unmetered network'));
+    expect(result.availableCapabilities, contains('power saver disabled'));
+    expect(result.availableCapabilities, contains('refresh rate >= 60Hz'));
     expect(result.missingCapabilities, contains('battery level >= 95%'));
   });
 

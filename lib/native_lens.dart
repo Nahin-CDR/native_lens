@@ -21,6 +21,7 @@ import 'platform_summary.dart';
 import 'power_state.dart';
 import 'src/feature_mapping.dart';
 import 'src/preset_task_mapping.dart';
+import 'src/streaming_readiness_mapping.dart';
 import 'system_feature.dart';
 import 'device_orientation_info.dart';
 import 'native_lens_task.dart';
@@ -395,6 +396,19 @@ class NativeLens {
     return analyzeCustomTask(
       taskName: nativeLensFeatureDisplayName(feature),
       requirements: nativeLensFeatureRequirements(feature, options: options),
+    );
+  }
+
+  /// Analyzes current device and network readiness for streaming preflight.
+  ///
+  /// This is a readiness signal only; it does not validate a specific stream,
+  /// URL, CDN, DRM configuration, player, or full playback pipeline.
+  Future<NativeLensCustomTaskResult> analyzeStreamingReadiness({
+    NativeLensFeatureOptions options = const NativeLensFeatureOptions(),
+  }) {
+    return analyzeCustomTask(
+      taskName: 'Streaming Readiness',
+      requirements: nativeLensStreamingReadinessRequirements(options),
     );
   }
 
