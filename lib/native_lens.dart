@@ -41,6 +41,8 @@ export 'native_lens_task_requirements.dart';
 export 'native_lens_theme_mode.dart';
 export 'native_sensor.dart';
 export 'native_lens_report.dart';
+export 'native_lens_stream_probe_options.dart';
+export 'native_lens_stream_probe_result.dart';
 export 'native_task_risk_result.dart';
 export 'network_capability.dart';
 export 'network_speed_sample.dart';
