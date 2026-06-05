@@ -1,4 +1,4 @@
-## 0.13.0 - Unreleased
+## 0.13.0
 
 - Added Stream URL Probe Intelligence.
 - Added stream probe models for URL and manifest readiness results.
