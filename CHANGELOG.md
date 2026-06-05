@@ -1,3 +1,12 @@
+## 0.13.0 - Unreleased
+
+- Added Stream URL Probe Intelligence.
+- Added stream probe models for URL and manifest readiness results.
+- Added internal HLS manifest parser.
+- Added `probeStreamingUrl()`.
+- Added Stream URL Probe Intelligence section to the example app.
+- Added README guide for URL/manifest readiness probing.
+
 ## 0.12.0
 
 - Added Streaming Readiness Intelligence.

@@ -10,6 +10,8 @@ import 'native_lens_feature.dart';
 import 'native_lens_feature_options.dart';
 import 'native_lens_platform_interface.dart';
 import 'native_lens_report.dart';
+import 'native_lens_stream_probe_options.dart';
+import 'native_lens_stream_probe_result.dart';
 import 'native_sensor.dart';
 import 'native_task_risk_result.dart';
 import 'native_lens_preset.dart';
@@ -21,6 +23,7 @@ import 'platform_summary.dart';
 import 'power_state.dart';
 import 'src/feature_mapping.dart';
 import 'src/preset_task_mapping.dart';
+import 'src/stream_probe_engine.dart';
 import 'src/streaming_readiness_mapping.dart';
 import 'system_feature.dart';
 import 'device_orientation_info.dart';
@@ -412,6 +415,18 @@ class NativeLens {
       taskName: 'Streaming Readiness',
       requirements: nativeLensStreamingReadinessRequirements(options),
     );
+  }
+
+  /// Probes a stream URL for URL and manifest readiness before playback.
+  ///
+  /// This checks URL reachability and basic manifest signals only. It does not
+  /// validate DRM, CDN correctness, player setup, decoder initialization,
+  /// segment playback, or the full playback pipeline.
+  Future<NativeLensStreamProbeResult> probeStreamingUrl({
+    required String url,
+    NativeLensStreamProbeOptions options = const NativeLensStreamProbeOptions(),
+  }) {
+    return runStreamProbe(url: url, options: options);
   }
 
   Future<void> _evaluateCustomCameraRequirement(

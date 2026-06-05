@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:native_lens/native_lens.dart';
 import 'package:native_lens/native_lens_platform_interface.dart';
 import 'package:native_lens/native_lens_method_channel.dart';
 import 'package:native_lens/src/feature_mapping.dart';
 import 'package:native_lens/src/preset_task_mapping.dart';
+import 'package:native_lens/src/stream_probe_engine.dart';
 import 'package:native_lens/src/streaming_readiness_mapping.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -469,6 +473,14 @@ Map<String, Object?> stableCustomTaskResultFields(
   NativeLensCustomTaskResult result,
 ) {
   return Map<String, Object?>.from(result.toMap())..remove('analyzedAtMillis');
+}
+
+Map<String, Object?> stableStreamProbeResultFields(
+  NativeLensStreamProbeResult result,
+) {
+  return Map<String, Object?>.from(result.toMap())
+    ..remove('analyzedAtMillis')
+    ..remove('elapsedMillis');
 }
 
 void main() {
@@ -1089,6 +1101,90 @@ void main() {
     expect(result.availableCapabilities, contains('power saver disabled'));
     expect(result.availableCapabilities, contains('refresh rate >= 60Hz'));
     expect(result.missingCapabilities, contains('battery level >= 95%'));
+  });
+
+  test('probeStreamingUrl delegates to internal engine', () async {
+    await _withStreamProbeServer(
+      body: '''
+#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=800000
+360p/index.m3u8
+''',
+      contentType: 'application/vnd.apple.mpegurl',
+      testBody: (String url) async {
+        final NativeLens nativeLensPlugin = NativeLens();
+        const NativeLensStreamProbeOptions options =
+            NativeLensStreamProbeOptions();
+
+        final NativeLensStreamProbeResult publicResult = await nativeLensPlugin
+            .probeStreamingUrl(url: url, options: options);
+        final NativeLensStreamProbeResult engineResult = await runStreamProbe(
+          url: url,
+          options: options,
+        );
+
+        expect(publicResult, isA<NativeLensStreamProbeResult>());
+        expect(
+          stableStreamProbeResultFields(publicResult),
+          stableStreamProbeResultFields(engineResult),
+        );
+      },
+    );
+  });
+
+  test('probeStreamingUrl returns low risk for valid HLS manifest', () async {
+    await _withStreamProbeServer(
+      body: '''
+#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=800000
+360p/index.m3u8
+''',
+      contentType: 'application/vnd.apple.mpegurl',
+      testBody: (String url) async {
+        final NativeLensStreamProbeResult result = await NativeLens()
+            .probeStreamingUrl(url: url);
+
+        expect(result.riskLevel, 'low');
+        expect(result.canContinue, isTrue);
+        expect(result.statusCode, 200);
+        expect(result.isReachable, isTrue);
+        expect(result.isManifestReadable, isTrue);
+        expect(result.isLikelyHls, isTrue);
+        expect(result.hasVariantStreams, isTrue);
+        expect(result.variantUrls.single, endsWith('/360p/index.m3u8'));
+      },
+    );
+  });
+
+  test('probeStreamingUrl returns high risk for invalid URL', () async {
+    final NativeLensStreamProbeResult result = await NativeLens()
+        .probeStreamingUrl(url: 'not a stream url');
+
+    expect(result.riskLevel, 'high');
+    expect(result.canContinue, isFalse);
+    expect(result.errorCode, 'invalid_url');
+    expect(result.probeStage, 'urlValidation');
+  });
+
+  test('probeStreamingUrl returns warning result for non-HLS body', () async {
+    await _withStreamProbeServer(
+      body: '<html><body>Not an HLS manifest</body></html>',
+      contentType: 'text/html',
+      path: '/index.html',
+      testBody: (String url) async {
+        final NativeLensStreamProbeResult result = await NativeLens()
+            .probeStreamingUrl(url: url);
+
+        expect(result.riskLevel, 'medium');
+        expect(result.severity, 'warning');
+        expect(result.canContinue, isTrue);
+        expect(result.isReachable, isTrue);
+        expect(result.isManifestReadable, isTrue);
+        expect(result.isLikelyHls, isFalse);
+        expect(result.errorCode, 'not_hls_manifest');
+        expect(result.recommendations.single, contains('fallback'));
+      },
+    );
   });
 
   test('analyzePresetTask matches equivalent custom task analysis', () async {
@@ -1764,4 +1860,34 @@ void main() {
     expect(orientation.isPortrait, false);
     expect(orientation.isLandscape, true);
   });
+}
+
+Future<void> _withStreamProbeServer({
+  required String body,
+  required Future<void> Function(String url) testBody,
+  String? contentType,
+  String path = '/stream.m3u8',
+  int statusCode = 200,
+}) async {
+  final HttpServer server = await HttpServer.bind(
+    InternetAddress.loopbackIPv4,
+    0,
+  );
+  final StreamSubscription<HttpRequest> subscription = server.listen((
+    HttpRequest request,
+  ) {
+    request.response.statusCode = statusCode;
+    if (contentType != null) {
+      request.response.headers.set(HttpHeaders.contentTypeHeader, contentType);
+    }
+    request.response.write(body);
+    unawaited(request.response.close());
+  });
+
+  try {
+    await testBody('http://${server.address.host}:${server.port}$path');
+  } finally {
+    await subscription.cancel();
+    await server.close(force: true);
+  }
 }

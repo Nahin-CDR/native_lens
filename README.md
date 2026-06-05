@@ -352,6 +352,41 @@ guarantee.
 NativeLens does not validate a specific HLS URL, CDN, DRM license, ExoPlayer
 instance, AVPlayer item, or end-to-end playback pipeline.
 
+### Stream URL Probe Intelligence
+
+`analyzeStreamingReadiness()` checks current device/network readiness.
+`probeStreamingUrl()` checks URL/manifest readiness for a specific stream URL.
+
+Use `probeStreamingUrl()` when you want to know whether a stream URL is
+reachable and appears to contain a readable HLS manifest before playback
+startup.
+
+```dart
+final result = await NativeLens().probeStreamingUrl(
+  url: 'https://example.com/stream.m3u8',
+  options: const NativeLensStreamProbeOptions(
+    timeout: Duration(seconds: 8),
+    followRedirects: true,
+    requireHttps: true,
+  ),
+);
+
+if (result.riskLevel == 'low') {
+  // Try playback startup normally
+} else if (result.canContinue) {
+  // Warn user or use fallback quality
+} else {
+  // Show fallback
+}
+```
+
+The probe can report URL validation, HTTP status, final URL after redirects,
+content type hints, manifest readability, likely HLS signals, and extracted
+variant or segment URL counts.
+
+This does not validate DRM, CDN correctness, ExoPlayer, AVPlayer, decoder
+initialization, segment playback, or the full playback pipeline.
+
 ### Custom Task Requirements
 
 NativeLens can analyze whether a device is ready for a developer-defined custom

@@ -23,6 +23,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       TextEditingController(text: '20');
   final TextEditingController _streamingMinBatteryController =
       TextEditingController(text: '15');
+  final TextEditingController _streamProbeUrlController = TextEditingController(
+    text: 'https://example.com/stream.m3u8',
+  );
+  final TextEditingController _streamProbeTimeoutController =
+      TextEditingController(text: '8');
   PlatformSummary? _platformSummary;
   List<SystemFeature>? _systemFeatures;
   List<NativeSensor>? _sensors;
@@ -41,6 +46,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   NativeLensFeature _selectedFeature = NativeLensFeature.faceFilterCamera;
   NativeLensCustomTaskResult? _smartFeatureResult;
   NativeLensCustomTaskResult? _streamingReadinessResult;
+  NativeLensStreamProbeResult? _streamProbeResult;
   NativeLensCustomTaskResult? _customTaskResult;
   NativeLensPreset _selectedPreset = NativeLensPreset.liveStreaming;
   NativeLensCustomTaskResult? _presetTaskResult;
@@ -54,6 +60,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _isAnalyzingTaskRisk = false;
   bool _isAnalyzingSmartFeature = false;
   bool _isAnalyzingStreamingReadiness = false;
+  bool _isProbingStreamUrl = false;
   bool _isAnalyzingCustomTask = false;
   bool _isAnalyzingPresetTask = false;
   bool _isLoadingThemeMode = false;
@@ -65,6 +72,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _streamingHighPerformance = false;
   bool _streamingPreferUnmeteredNetwork = false;
   bool _streamingDisallowPowerSaveMode = false;
+  bool _streamProbeFollowRedirects = true;
+  bool _streamProbeRequireHttps = false;
   bool _customRequiresCamera = true;
   bool _customRequiresMicrophone = false;
   bool _customRequiresStableNetwork = false;
@@ -72,6 +81,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   String? _taskRiskErrorMessage;
   String? _smartFeatureErrorMessage;
   String? _streamingReadinessErrorMessage;
+  String? _streamProbeErrorMessage;
   String? _customTaskErrorMessage;
   String? _presetTaskErrorMessage;
   String? _themeModeErrorMessage;
@@ -92,6 +102,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _streamProbeTimeoutController.dispose();
+    _streamProbeUrlController.dispose();
     _streamingMinBatteryController.dispose();
     _featureMinBatteryController.dispose();
     _customMinBatteryController.dispose();
@@ -484,6 +496,43 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> probeStreamUrl() async {
+    setState(() {
+      _isProbingStreamUrl = true;
+      _streamProbeErrorMessage = null;
+    });
+
+    NativeLensStreamProbeResult? result;
+    String? errorMessage;
+    final String url = _streamProbeUrlController.text.trim();
+    final int parsedTimeoutSeconds =
+        int.tryParse(_streamProbeTimeoutController.text.trim()) ?? 8;
+    final int timeoutSeconds = parsedTimeoutSeconds > 0
+        ? parsedTimeoutSeconds
+        : 8;
+
+    try {
+      result = await _nativeLensPlugin.probeStreamingUrl(
+        url: url,
+        options: NativeLensStreamProbeOptions(
+          timeout: Duration(seconds: timeoutSeconds),
+          followRedirects: _streamProbeFollowRedirects,
+          requireHttps: _streamProbeRequireHttps,
+        ),
+      );
+    } catch (error) {
+      errorMessage = 'Failed to probe stream URL: $error';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _streamProbeResult = result;
+      _isProbingStreamUrl = false;
+      _streamProbeErrorMessage = errorMessage;
+    });
+  }
+
   Future<void> analyzePresetFeature() async {
     setState(() {
       _isAnalyzingPresetTask = true;
@@ -666,6 +715,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           const SizedBox(height: 16),
 
           _streamingReadinessIntelligenceSection(),
+
+          const SizedBox(height: 16),
+
+          _streamUrlProbeIntelligenceSection(),
 
           const SizedBox(height: 16),
 
@@ -1237,6 +1290,89 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 
+  Widget _streamUrlProbeIntelligenceSection() {
+    final NativeLensStreamProbeResult? result = _streamProbeResult;
+
+    return _sectionCard(
+      title: 'Stream URL Probe Intelligence',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text('Checks URL/manifest readiness before playback startup.'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _streamProbeUrlController,
+            enabled: !_isProbingStreamUrl,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'Stream URL',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _streamProbeTimeoutController,
+            enabled: !_isProbingStreamUrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Timeout seconds',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Follow redirects'),
+            value: _streamProbeFollowRedirects,
+            onChanged: _isProbingStreamUrl
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _streamProbeFollowRedirects = value;
+                    });
+                  },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Require HTTPS'),
+            value: _streamProbeRequireHttps,
+            onChanged: _isProbingStreamUrl
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _streamProbeRequireHttps = value;
+                    });
+                  },
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _isProbingStreamUrl ? null : probeStreamUrl,
+            icon: _isProbingStreamUrl
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.travel_explore_rounded),
+            label: Text(
+              _isProbingStreamUrl ? 'Probing...' : 'Probe Streaming URL',
+            ),
+          ),
+          if (_streamProbeErrorMessage != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _streamProbeErrorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (result != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _streamProbeResultPanel(result),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _customTaskRequirementsSection() {
     final NativeLensCustomTaskResult? result = _customTaskResult;
     final NativeLensCustomTaskResult? presetResult = _presetTaskResult;
@@ -1407,6 +1543,83 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             capabilities: result.missingCapabilities,
             emptyMessage: 'No missing custom task capabilities detected.',
           ),
+          const SizedBox(height: 8),
+          const Text(
+            'Recommendations',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          if (result.recommendations.isEmpty)
+            const Text('No recommendations.')
+          else
+            ...result.recommendations.map(
+              (String recommendation) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('- $recommendation'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _streamProbeResultPanel(NativeLensStreamProbeResult result) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _SummaryRow(label: 'Risk', value: result.riskLevel),
+          _SummaryRow(
+            label: 'Can Continue',
+            value: result.canContinue ? 'Yes' : 'No',
+          ),
+          _SummaryRow(
+            label: 'Status Code',
+            value: result.statusCode?.toString() ?? 'Unknown',
+          ),
+          _SummaryRow(
+            label: 'Content Type',
+            value: result.contentType ?? 'Unknown',
+          ),
+          _SummaryRow(label: 'Final URL', value: result.finalUrl),
+          _SummaryRow(
+            label: 'Reachable',
+            value: result.isReachable ? 'Yes' : 'No',
+          ),
+          _SummaryRow(
+            label: 'Manifest',
+            value: result.isManifestReadable ? 'Readable' : 'Not readable',
+          ),
+          _SummaryRow(
+            label: 'Likely HLS',
+            value: result.isLikelyHls ? 'Yes' : 'No',
+          ),
+          _SummaryRow(
+            label: 'Variants',
+            value: result.variantUrls.length.toString(),
+          ),
+          _SummaryRow(
+            label: 'Segments',
+            value: result.segmentUrls.length.toString(),
+          ),
+          const SizedBox(height: 8),
+          const Text('Reasons', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          if (result.reasons.isEmpty)
+            const Text('No reasons reported.')
+          else
+            ...result.reasons.map(
+              (String reason) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('- $reason'),
+              ),
+            ),
           const SizedBox(height: 8),
           const Text(
             'Recommendations',
