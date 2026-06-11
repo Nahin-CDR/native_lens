@@ -1,9 +1,9 @@
 # NativeLens
 
 NativeLens is a Flutter capability intelligence SDK with deep Android support
-and initial iOS foundation support. It uses Platform Channels to inspect native
-device capabilities, build runtime reports, and run offline compatibility
-analysis from Dart.
+and privacy-safe iOS foundation support. It uses Platform Channels to inspect
+native device capabilities, build runtime reports, and run offline
+compatibility analysis from Dart.
 
 NativeLens is designed for apps that need a clear, developer-friendly snapshot
 of the device they are running on without adding a backend, AI service, or
@@ -11,16 +11,18 @@ heavy dashboard layer.
 
 ## Key Features
 
-- Android platform summary, including manufacturer, brand, model, SDK, and
-  Android release.
+- Platform summary on Android and a safe iOS baseline for OS, model, runtime,
+  memory, processors, and thermal state.
 - System feature matrix from Android PackageManager.
-- Sensor capability profiling from SensorManager.
-- Display capability profiling, including density, refresh rates, and HDR.
+- Sensor capability profiling from Android SensorManager.
+- Display capability profiling, including density, refresh rates, HDR, and
+  safe iOS screen metrics.
 - Media codec capability profiling, including encoder and decoder support.
 - Camera2 capability profiling without opening the camera or requiring camera
   permission.
 - Power and battery runtime state.
-- Network capability snapshots and real-time network capability updates.
+- Network capability snapshots and real-time network capability updates on
+  Android and iOS.
 - App-level network speed stream based on this app UID traffic.
 - Full NativeLens report aggregation.
 - Offline compatibility summary using simple Dart rules.
@@ -31,7 +33,7 @@ Add NativeLens to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  native_lens: ^0.7.0
+  native_lens: ^0.13.0
 ```
 
 Then run:
@@ -84,10 +86,40 @@ stays static and launch-screen safe.
 
 ## Platform Support
 
-| Platform | Support level |
-| --- | --- |
-| Android | Deep native capability support for platform summary, sensors, display, media codecs, camera capabilities, power state, and network diagnostics |
-| iOS | Foundation support with platform summary, power state, network capability, device orientation, and safe fallbacks for unsupported deep capability modules |
+| Capability | Android | iOS | Notes |
+| --- | --- | --- | --- |
+| Platform summary | Native support | Native baseline | iOS includes safe OS, model, simulator/device, memory, processor, and thermal fields. Android-specific SDK/release fields remain Android-first. |
+| Display info | Native support | Native baseline | iOS includes logical points, native pixels, scale, brightness, and current refresh rate. HDR type discovery remains Android-only. |
+| Power/battery state | Native support | Native baseline | iOS includes battery level/state, charging/full status, Low Power Mode, battery monitoring availability, and thermal state. Android-only optimization and health/temperature fields fall back safely on iOS. |
+| Network capability | Native support | Native baseline | iOS includes reachability, interface type, expensive/constrained status, and live updates. Android-only VPN, Bluetooth, low-latency, and high-bandwidth flags fall back safely on iOS. |
+| System features | Android PackageManager | Safe fallback | iOS returns an empty list because there is no equivalent PackageManager feature matrix. |
+| Sensors | Android SensorManager | Safe fallback | iOS returns an empty list in the current API rather than exposing partial or permission-sensitive sensor data. |
+| Media codecs | Android MediaCodecList | Safe fallback | iOS returns an empty list; codec inventory is not exposed as a deep iOS capability module yet. |
+| Camera capabilities | Android Camera2 metadata | Safe fallback | iOS returns an empty list and does not request camera permission or open the camera. |
+| Theme mode | Native support | Native support | Reports light, dark, or unknown and supports live updates. |
+| Device orientation | Native support | Native support | Snapshot and stream APIs are available on both mobile platforms. |
+| App traffic speed | Android TrafficStats | Safe fallback | iOS currently reports unsupported/zero samples. This is not a full internet speed test. |
+| Stream URL probe / HLS manifest probe | Dart support | Dart support | URL and manifest readiness checks run in Dart. They do not validate DRM, CDN correctness, player setup, or end-to-end playback. |
+
+### iOS Capability Baseline
+
+The iOS baseline is intentionally conservative. It improves these existing APIs:
+
+- `getPlatformSummary()` reports `platformName`, `osName`, `osVersion`,
+  `localizedModel`, simulator/device environment, physical memory, processor
+  counts, thermal state, and `isIosNative`.
+- `getDisplayInfo()` reports logical screen size in points, native pixel size,
+  scale, native scale, brightness, current refresh rate, and `isIosNative`.
+- `getPowerState()` and `watchPowerState()` report battery level when available,
+  battery state, charging/full status, battery monitoring availability, Low
+  Power Mode, thermal state, and `isIosNative`.
+- `getNetworkCapability()` and `networkCapabilityStream` report connection
+  status, interface type, expensive network status, constrained network status,
+  and `isIosNative`.
+
+Unsupported Android-only fields return safe values such as `null`, `false`,
+`0`, `Unknown`, or an empty list. NativeLens does not request permissions for
+these iOS baseline fields.
 
 ## Basic Usage
 
@@ -548,7 +580,7 @@ is not a full internet speed test and does not use device-wide network stats.
 
 ### Device Orientation
 
-Get the current device orientation snapshot from Android:
+Get the current device orientation snapshot from the native platform:
 
 ```dart
 final DeviceOrientationInfo orientation =
@@ -574,12 +606,17 @@ nativeLens.deviceOrientationStream.listen((DeviceOrientationInfo orientation) {
 NativeLens focuses on device capability and runtime state. It does not collect:
 
 - Unique device identifiers.
+- Device name.
 - Contacts.
 - Photos.
 - Location.
 - Device-wide network usage statistics.
+- SSID, BSSID, IP address, MAC address, or carrier name.
 
 Network speed samples are based on this app UID traffic only.
+
+The iOS platform, display, power, and network baselines use privacy-safe system
+APIs and do not request permissions.
 
 ## Android Permissions
 
@@ -598,8 +635,9 @@ It reads Camera2 metadata only and does not open the camera or capture media.
 
 ## Current Limitations
 
-- Deep Android capability support remains the primary focus.
-- iOS support is currently foundational and safe-fallback oriented.
+- Deep Android capability modules remain broader than iOS modules.
+- iOS support is currently focused on privacy-safe baseline fields and
+  safe-fallback behavior for unsupported deep capability modules.
 - No macOS, Windows, Linux, or web implementation yet.
 
 ## Author

@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Added README support matrix for Android and iOS capability coverage,
+  fallback behavior, and privacy-safe iOS baseline fields.
 - Improved iOS network capability baseline with safe interface type,
   expensive/constrained network, and iOS-native marker fields.
 - Improved iOS power capability baseline with safe battery state, monitoring,
