@@ -74,7 +74,7 @@ class NativeLens {
     return NativeLensPlatform.instance.getSensors();
   }
 
-  /// Returns native Android display capabilities for the active display.
+  /// Returns native display capabilities for the active display.
   Future<DisplayInfo> getDisplayInfo() {
     return NativeLensPlatform.instance.getDisplayInfo();
   }

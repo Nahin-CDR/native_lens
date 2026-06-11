@@ -262,6 +262,49 @@ void main() {
     expect(displayInfo.supportedRefreshRates, <double>[60, 90, 120]);
     expect(displayInfo.isHdrSupported, true);
     expect(displayInfo.supportedHdrTypes, <String>['HDR10', 'HLG']);
+    expect(displayInfo.widthPoints, isNull);
+    expect(displayInfo.heightPoints, isNull);
+    expect(displayInfo.nativeScale, isNull);
+    expect(displayInfo.nativeWidthPixels, isNull);
+    expect(displayInfo.nativeHeightPixels, isNull);
+    expect(displayInfo.brightness, isNull);
+    expect(displayInfo.isIosNative, false);
+  });
+
+  test('DisplayInfo parses iOS native baseline fields', () {
+    final DisplayInfo displayInfo = DisplayInfo.fromMap(<Object?, Object?>{
+      'widthPixels': 1179,
+      'heightPixels': 2556,
+      'density': 3.0,
+      'densityDpi': 480,
+      'refreshRate': 120.0,
+      'supportedRefreshRates': <double>[120.0],
+      'isHdrSupported': false,
+      'supportedHdrTypes': <String>[],
+      'widthPoints': 393.0,
+      'heightPoints': 852.0,
+      'nativeScale': 3.0,
+      'nativeWidthPixels': 1179,
+      'nativeHeightPixels': 2556,
+      'brightness': 0.75,
+      'isIosNative': true,
+    });
+
+    expect(displayInfo.widthPixels, 1179);
+    expect(displayInfo.heightPixels, 2556);
+    expect(displayInfo.density, 3.0);
+    expect(displayInfo.densityDpi, 480);
+    expect(displayInfo.refreshRate, 120.0);
+    expect(displayInfo.supportedRefreshRates, <double>[120.0]);
+    expect(displayInfo.isHdrSupported, false);
+    expect(displayInfo.supportedHdrTypes, <String>[]);
+    expect(displayInfo.widthPoints, 393.0);
+    expect(displayInfo.heightPoints, 852.0);
+    expect(displayInfo.nativeScale, 3.0);
+    expect(displayInfo.nativeWidthPixels, 1179);
+    expect(displayInfo.nativeHeightPixels, 2556);
+    expect(displayInfo.brightness, 0.75);
+    expect(displayInfo.isIosNative, true);
   });
 
   test('getMediaCodecs', () async {

@@ -1,4 +1,4 @@
-/// Native Android display information reported by the device.
+/// Native display information reported by the device.
 class DisplayInfo {
   /// Creates a display information description.
   const DisplayInfo({
@@ -10,6 +10,13 @@ class DisplayInfo {
     required this.supportedRefreshRates,
     required this.isHdrSupported,
     required this.supportedHdrTypes,
+    this.widthPoints,
+    this.heightPoints,
+    this.nativeScale,
+    this.nativeWidthPixels,
+    this.nativeHeightPixels,
+    this.brightness,
+    this.isIosNative = false,
   });
 
   /// The display width in physical pixels.
@@ -36,6 +43,27 @@ class DisplayInfo {
   /// Readable names for supported HDR types.
   final List<String> supportedHdrTypes;
 
+  /// The display width in logical points, when provided by the platform.
+  final double? widthPoints;
+
+  /// The display height in logical points, when provided by the platform.
+  final double? heightPoints;
+
+  /// The native display scale, when safely available.
+  final double? nativeScale;
+
+  /// The native display width in physical pixels, when safely available.
+  final int? nativeWidthPixels;
+
+  /// The native display height in physical pixels, when safely available.
+  final int? nativeHeightPixels;
+
+  /// The current screen brightness, usually in the range 0.0 to 1.0.
+  final double? brightness;
+
+  /// Whether this display information came from the iOS native implementation.
+  final bool isIosNative;
+
   /// Creates a [DisplayInfo] from a map returned by the native platform.
   factory DisplayInfo.fromMap(Map<Object?, Object?> map) {
     return DisplayInfo(
@@ -47,12 +75,19 @@ class DisplayInfo {
       supportedRefreshRates: _readDoubleList(map, 'supportedRefreshRates'),
       isHdrSupported: _readBool(map, 'isHdrSupported'),
       supportedHdrTypes: _readStringList(map, 'supportedHdrTypes'),
+      widthPoints: _readOptionalDouble(map, 'widthPoints'),
+      heightPoints: _readOptionalDouble(map, 'heightPoints'),
+      nativeScale: _readOptionalDouble(map, 'nativeScale'),
+      nativeWidthPixels: _readOptionalInt(map, 'nativeWidthPixels'),
+      nativeHeightPixels: _readOptionalInt(map, 'nativeHeightPixels'),
+      brightness: _readOptionalDouble(map, 'brightness'),
+      isIosNative: _readBool(map, 'isIosNative'),
     );
   }
 
   /// Converts this display information to a map using the native field names.
   Map<String, Object> toMap() {
-    return <String, Object>{
+    final Map<String, Object> map = <String, Object>{
       'widthPixels': widthPixels,
       'heightPixels': heightPixels,
       'density': density,
@@ -61,7 +96,23 @@ class DisplayInfo {
       'supportedRefreshRates': supportedRefreshRates,
       'isHdrSupported': isHdrSupported,
       'supportedHdrTypes': supportedHdrTypes,
+      'isIosNative': isIosNative,
     };
+
+    void addOptional(String key, Object? value) {
+      if (value != null) {
+        map[key] = value;
+      }
+    }
+
+    addOptional('widthPoints', widthPoints);
+    addOptional('heightPoints', heightPoints);
+    addOptional('nativeScale', nativeScale);
+    addOptional('nativeWidthPixels', nativeWidthPixels);
+    addOptional('nativeHeightPixels', nativeHeightPixels);
+    addOptional('brightness', brightness);
+
+    return map;
   }
 
   /// Returns a readable string containing all display fields.
@@ -75,7 +126,14 @@ class DisplayInfo {
         'refreshRate: $refreshRate, '
         'supportedRefreshRates: $supportedRefreshRates, '
         'isHdrSupported: $isHdrSupported, '
-        'supportedHdrTypes: $supportedHdrTypes'
+        'supportedHdrTypes: $supportedHdrTypes, '
+        'widthPoints: $widthPoints, '
+        'heightPoints: $heightPoints, '
+        'nativeScale: $nativeScale, '
+        'nativeWidthPixels: $nativeWidthPixels, '
+        'nativeHeightPixels: $nativeHeightPixels, '
+        'brightness: $brightness, '
+        'isIosNative: $isIosNative'
         ')';
   }
 
@@ -87,12 +145,28 @@ class DisplayInfo {
     return 0;
   }
 
+  static int? _readOptionalInt(Map<Object?, Object?> map, String key) {
+    final Object? value = map[key];
+    if (value is int) {
+      return value;
+    }
+    return null;
+  }
+
   static double _readDouble(Map<Object?, Object?> map, String key) {
     final Object? value = map[key];
     if (value is num) {
       return value.toDouble();
     }
     return 0;
+  }
+
+  static double? _readOptionalDouble(Map<Object?, Object?> map, String key) {
+    final Object? value = map[key];
+    if (value is num) {
+      return value.toDouble();
+    }
+    return null;
   }
 
   static bool _readBool(Map<Object?, Object?> map, String key) {

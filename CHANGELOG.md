@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Improved iOS display capability baseline with safe logical size, native
+  pixel size, scale, brightness, and iOS-native marker fields.
 - Improved iOS platform summary baseline with safe native OS, model, runtime,
   memory, processor, thermal state, and iOS-native marker fields.
 

@@ -50,7 +50,7 @@ abstract class NativeLensPlatform extends PlatformInterface {
     throw UnimplementedError('getSensors() has not been implemented.');
   }
 
-  /// Returns native Android display capabilities for the active display.
+  /// Returns native display capabilities for the active display.
   Future<DisplayInfo> getDisplayInfo() {
     throw UnimplementedError('getDisplayInfo() has not been implemented.');
   }

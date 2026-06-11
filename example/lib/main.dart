@@ -778,6 +778,55 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             ),
           ),
 
+          const SizedBox(height: 16),
+          _sectionCard(
+            title: 'Display',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _SummaryRow(
+                  label: 'Pixels',
+                  value:
+                      '${displayInfo.widthPixels} x '
+                      '${displayInfo.heightPixels}',
+                ),
+                if (displayInfo.widthPoints != null &&
+                    displayInfo.heightPoints != null)
+                  _SummaryRow(
+                    label: 'Points',
+                    value:
+                        '${displayInfo.widthPoints!.toStringAsFixed(0)} x '
+                        '${displayInfo.heightPoints!.toStringAsFixed(0)}',
+                  ),
+                _SummaryRow(
+                  label: 'Scale',
+                  value: displayInfo.density.toStringAsFixed(2),
+                ),
+                if (displayInfo.nativeScale != null)
+                  _SummaryRow(
+                    label: 'Native Scale',
+                    value: displayInfo.nativeScale!.toStringAsFixed(2),
+                  ),
+                _SummaryRow(
+                  label: 'Refresh',
+                  value: '${displayInfo.refreshRate.toStringAsFixed(0)} Hz',
+                ),
+                _SummaryRow(
+                  label: 'HDR',
+                  value: displayInfo.isHdrSupported ? 'Supported' : 'No',
+                ),
+                if (displayInfo.brightness != null)
+                  _SummaryRow(
+                    label: 'Brightness',
+                    value:
+                        '${(displayInfo.brightness! * 100).toStringAsFixed(0)}%',
+                  ),
+                if (displayInfo.isIosNative)
+                  const _SummaryRow(label: 'iOS Native', value: 'Yes'),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 24),
           _sectionCard(
             title: 'Platform Summary',

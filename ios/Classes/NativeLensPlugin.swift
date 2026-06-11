@@ -213,19 +213,30 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
 
   private func getDisplayInfo() -> [String: Any] {
     let screen = UIScreen.main
+    let logicalBounds = screen.bounds
     let bounds = screen.nativeBounds
     let refreshRate = Double(screen.maximumFramesPerSecond)
     let density = screen.scale
+    let nativeScale = screen.nativeScale
+    let nativeWidthPixels = Int(bounds.width.rounded())
+    let nativeHeightPixels = Int(bounds.height.rounded())
 
     return [
-      "widthPixels": Int(bounds.width),
-      "heightPixels": Int(bounds.height),
+      "widthPixels": nativeWidthPixels,
+      "heightPixels": nativeHeightPixels,
       "density": density,
       "densityDpi": Int(160.0 * density),
       "refreshRate": refreshRate,
       "supportedRefreshRates": [refreshRate],
       "isHdrSupported": false,
       "supportedHdrTypes": [String](),
+      "widthPoints": Double(logicalBounds.width),
+      "heightPoints": Double(logicalBounds.height),
+      "nativeScale": nativeScale,
+      "nativeWidthPixels": nativeWidthPixels,
+      "nativeHeightPixels": nativeHeightPixels,
+      "brightness": Double(screen.brightness),
+      "isIosNative": true,
     ]
   }
 
