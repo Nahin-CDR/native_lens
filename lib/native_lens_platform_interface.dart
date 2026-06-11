@@ -67,7 +67,7 @@ abstract class NativeLensPlatform extends PlatformInterface {
     );
   }
 
-  /// Returns native Android battery and power runtime state.
+  /// Returns native battery and power runtime state.
   Future<PowerState> getPowerState() {
     throw UnimplementedError('getPowerState() has not been implemented.');
   }

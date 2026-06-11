@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Improved iOS power capability baseline with safe battery state, monitoring,
+  low power mode, thermal state, and iOS-native marker fields.
 - Improved iOS display capability baseline with safe logical size, native
   pixel size, scale, brightness, and iOS-native marker fields.
 - Improved iOS platform summary baseline with safe native OS, model, runtime,

@@ -356,6 +356,43 @@ void main() {
     expect(powerState.batteryTemperatureCelsius, 31.5);
     expect(powerState.isPowerSaveMode, false);
     expect(powerState.isIgnoringBatteryOptimizations, false);
+    expect(powerState.batteryState, isNull);
+    expect(powerState.isBatteryMonitoringEnabled, isNull);
+    expect(powerState.isBatteryMonitoringAvailable, isNull);
+    expect(powerState.thermalState, isNull);
+    expect(powerState.isIosNative, false);
+  });
+
+  test('PowerState parses iOS native baseline fields', () {
+    final PowerState powerState = PowerState.fromMap(<Object?, Object?>{
+      'batteryLevel': 76,
+      'isCharging': true,
+      'chargingSource': 'Charging',
+      'batteryHealth': 'Unknown',
+      'batteryStatus': 'Charging',
+      'batteryTemperatureCelsius': 0.0,
+      'isPowerSaveMode': true,
+      'isIgnoringBatteryOptimizations': false,
+      'batteryState': 'charging',
+      'isBatteryMonitoringEnabled': true,
+      'isBatteryMonitoringAvailable': true,
+      'thermalState': 'nominal',
+      'isIosNative': true,
+    });
+
+    expect(powerState.batteryLevel, 76);
+    expect(powerState.isCharging, true);
+    expect(powerState.chargingSource, 'Charging');
+    expect(powerState.batteryHealth, 'Unknown');
+    expect(powerState.batteryStatus, 'Charging');
+    expect(powerState.batteryTemperatureCelsius, 0.0);
+    expect(powerState.isPowerSaveMode, true);
+    expect(powerState.isIgnoringBatteryOptimizations, false);
+    expect(powerState.batteryState, 'charging');
+    expect(powerState.isBatteryMonitoringEnabled, true);
+    expect(powerState.isBatteryMonitoringAvailable, true);
+    expect(powerState.thermalState, 'nominal');
+    expect(powerState.isIosNative, true);
   });
 
   test('watchPowerState parses stream events', () async {

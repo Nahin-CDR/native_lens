@@ -89,7 +89,7 @@ class NativeLens {
     return NativeLensPlatform.instance.getCameraCapabilities();
   }
 
-  /// Returns native Android battery and power runtime state.
+  /// Returns native battery and power runtime state.
   Future<PowerState> getPowerState() {
     return NativeLensPlatform.instance.getPowerState();
   }

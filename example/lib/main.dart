@@ -912,6 +912,42 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+                _SummaryRow(label: 'Status', value: powerState.batteryStatus),
+                _SummaryRow(
+                  label: 'Charging',
+                  value: powerState.isCharging ? 'Yes' : 'No',
+                ),
+                _SummaryRow(label: 'Source', value: powerState.chargingSource),
+                _SummaryRow(
+                  label: 'Low Power',
+                  value: powerState.isPowerSaveMode ? 'On' : 'Off',
+                ),
+                if (powerState.batteryState != null)
+                  _SummaryRow(
+                    label: 'Battery State',
+                    value: powerState.batteryState!,
+                  ),
+                if (powerState.isBatteryMonitoringEnabled != null)
+                  _SummaryRow(
+                    label: 'Monitoring',
+                    value: powerState.isBatteryMonitoringEnabled!
+                        ? 'Enabled'
+                        : 'Disabled',
+                  ),
+                if (powerState.isBatteryMonitoringAvailable != null)
+                  _SummaryRow(
+                    label: 'Battery Data',
+                    value: powerState.isBatteryMonitoringAvailable!
+                        ? 'Available'
+                        : 'Unavailable',
+                  ),
+                if (powerState.thermalState != null)
+                  _SummaryRow(
+                    label: 'Thermal',
+                    value: powerState.thermalState!,
+                  ),
+                if (powerState.isIosNative)
+                  const _SummaryRow(label: 'iOS Native', value: 'Yes'),
               ],
             ),
           ),

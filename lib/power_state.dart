@@ -1,4 +1,4 @@
-/// Native Android battery and power state reported by the device.
+/// Native battery and power state reported by the device.
 class PowerState {
   /// Creates a power state description.
   const PowerState({
@@ -10,6 +10,11 @@ class PowerState {
     required this.batteryTemperatureCelsius,
     required this.isPowerSaveMode,
     required this.isIgnoringBatteryOptimizations,
+    this.batteryState,
+    this.isBatteryMonitoringEnabled,
+    this.isBatteryMonitoringAvailable,
+    this.thermalState,
+    this.isIosNative = false,
   });
 
   /// The battery level percentage from 0 to 100, or 0 when unavailable.
@@ -36,6 +41,21 @@ class PowerState {
   /// Whether this app is ignoring Android battery optimizations.
   final bool isIgnoringBatteryOptimizations;
 
+  /// Platform battery state, such as unknown, unplugged, charging, or full.
+  final String? batteryState;
+
+  /// Whether native battery monitoring is enabled for this reading.
+  final bool? isBatteryMonitoringEnabled;
+
+  /// Whether native battery monitoring currently has usable battery data.
+  final bool? isBatteryMonitoringAvailable;
+
+  /// Current thermal state, when safely available.
+  final String? thermalState;
+
+  /// Whether this power state came from the iOS native implementation.
+  final bool isIosNative;
+
   /// Creates a [PowerState] from a map returned by the native platform.
   factory PowerState.fromMap(Map<Object?, Object?> map) {
     return PowerState(
@@ -50,12 +70,23 @@ class PowerState {
         map,
         'isIgnoringBatteryOptimizations',
       ),
+      batteryState: _readOptionalString(map, 'batteryState'),
+      isBatteryMonitoringEnabled: _readOptionalBool(
+        map,
+        'isBatteryMonitoringEnabled',
+      ),
+      isBatteryMonitoringAvailable: _readOptionalBool(
+        map,
+        'isBatteryMonitoringAvailable',
+      ),
+      thermalState: _readOptionalString(map, 'thermalState'),
+      isIosNative: _readBool(map, 'isIosNative'),
     );
   }
 
   /// Converts this power state to a map using the native field names.
   Map<String, Object> toMap() {
-    return <String, Object>{
+    final Map<String, Object> map = <String, Object>{
       'batteryLevel': batteryLevel,
       'isCharging': isCharging,
       'chargingSource': chargingSource,
@@ -64,7 +95,21 @@ class PowerState {
       'batteryTemperatureCelsius': batteryTemperatureCelsius,
       'isPowerSaveMode': isPowerSaveMode,
       'isIgnoringBatteryOptimizations': isIgnoringBatteryOptimizations,
+      'isIosNative': isIosNative,
     };
+
+    void addOptional(String key, Object? value) {
+      if (value != null) {
+        map[key] = value;
+      }
+    }
+
+    addOptional('batteryState', batteryState);
+    addOptional('isBatteryMonitoringEnabled', isBatteryMonitoringEnabled);
+    addOptional('isBatteryMonitoringAvailable', isBatteryMonitoringAvailable);
+    addOptional('thermalState', thermalState);
+
+    return map;
   }
 
   /// Returns a readable string containing all power fields.
@@ -78,7 +123,12 @@ class PowerState {
         'batteryStatus: $batteryStatus, '
         'batteryTemperatureCelsius: $batteryTemperatureCelsius, '
         'isPowerSaveMode: $isPowerSaveMode, '
-        'isIgnoringBatteryOptimizations: $isIgnoringBatteryOptimizations'
+        'isIgnoringBatteryOptimizations: $isIgnoringBatteryOptimizations, '
+        'batteryState: $batteryState, '
+        'isBatteryMonitoringEnabled: $isBatteryMonitoringEnabled, '
+        'isBatteryMonitoringAvailable: $isBatteryMonitoringAvailable, '
+        'thermalState: $thermalState, '
+        'isIosNative: $isIosNative'
         ')';
   }
 
@@ -106,11 +156,27 @@ class PowerState {
     return false;
   }
 
+  static bool? _readOptionalBool(Map<Object?, Object?> map, String key) {
+    final Object? value = map[key];
+    if (value is bool) {
+      return value;
+    }
+    return null;
+  }
+
   static String _readString(Map<Object?, Object?> map, String key) {
     final Object? value = map[key];
     if (value is String && value.isNotEmpty) {
       return value;
     }
     return 'Unknown';
+  }
+
+  static String? _readOptionalString(Map<Object?, Object?> map, String key) {
+    final Object? value = map[key];
+    if (value is String && value.isNotEmpty) {
+      return value;
+    }
+    return null;
   }
 }

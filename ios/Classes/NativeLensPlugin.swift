@@ -264,10 +264,16 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
 
   private func createPowerState() -> [String: Any] {
     let device = UIDevice.current
-    let level = Int((device.batteryLevel >= 0 ? device.batteryLevel : 0.0) * 100.0)
+    let rawBatteryLevel = device.batteryLevel
+    let isBatteryLevelAvailable = rawBatteryLevel >= 0
+    let level = Int((isBatteryLevelAvailable ? rawBatteryLevel : 0.0) * 100.0)
     let state = device.batteryState
     let status = batteryStatusName(from: state)
+    let batteryState = batteryStateName(from: state)
     let isCharging = state == .charging || state == .full
+    let isMonitoringEnabled = device.isBatteryMonitoringEnabled
+    let isMonitoringAvailable = isMonitoringEnabled &&
+      (isBatteryLevelAvailable || state != .unknown)
 
     return [
       "batteryLevel": level,
@@ -278,6 +284,11 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
       "batteryTemperatureCelsius": 0.0,
       "isPowerSaveMode": ProcessInfo.processInfo.isLowPowerModeEnabled,
       "isIgnoringBatteryOptimizations": false,
+      "batteryState": batteryState,
+      "isBatteryMonitoringEnabled": isMonitoringEnabled,
+      "isBatteryMonitoringAvailable": isMonitoringAvailable,
+      "thermalState": thermalStateName(),
+      "isIosNative": true,
     ]
   }
 
@@ -612,6 +623,19 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
       return "Not charging"
     default:
       return "Unknown"
+    }
+  }
+
+  private func batteryStateName(from state: UIDevice.BatteryState) -> String {
+    switch state {
+    case .charging:
+      return "charging"
+    case .full:
+      return "full"
+    case .unplugged:
+      return "unplugged"
+    default:
+      return "unknown"
     }
   }
 
