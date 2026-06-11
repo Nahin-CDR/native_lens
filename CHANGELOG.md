@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Improved iOS network capability baseline with safe interface type,
+  expensive/constrained network, and iOS-native marker fields.
 - Improved iOS power capability baseline with safe battery state, monitoring,
   low power mode, thermal state, and iOS-native marker fields.
 - Improved iOS display capability baseline with safe logical size, native

@@ -503,5 +503,39 @@ void main() {
     expect(networkCapability.hasBluetooth, false);
     expect(networkCapability.hasLowLatency, false);
     expect(networkCapability.hasHighBandwidth, false);
+    expect(networkCapability.interfaceTypes, isNull);
+    expect(networkCapability.isConstrained, isNull);
+    expect(networkCapability.isIosNative, false);
+  });
+
+  test('NetworkCapability parses iOS native baseline fields', () {
+    final NetworkCapability networkCapability = NetworkCapability.fromMap(
+      <Object?, Object?>{
+        'isConnected': true,
+        'transportType': 'Wi-Fi, Cellular',
+        'isValidated': true,
+        'isMetered': true,
+        'hasVpn': false,
+        'hasWifi': true,
+        'hasCellular': true,
+        'hasEthernet': false,
+        'hasBluetooth': false,
+        'hasLowLatency': false,
+        'hasHighBandwidth': false,
+        'interfaceTypes': <String>['Wi-Fi', 'Cellular'],
+        'isConstrained': true,
+        'isIosNative': true,
+      },
+    );
+
+    expect(networkCapability.isConnected, true);
+    expect(networkCapability.transportType, 'Wi-Fi, Cellular');
+    expect(networkCapability.isValidated, true);
+    expect(networkCapability.isMetered, true);
+    expect(networkCapability.hasWifi, true);
+    expect(networkCapability.hasCellular, true);
+    expect(networkCapability.interfaceTypes, <String>['Wi-Fi', 'Cellular']);
+    expect(networkCapability.isConstrained, true);
+    expect(networkCapability.isIosNative, true);
   });
 }

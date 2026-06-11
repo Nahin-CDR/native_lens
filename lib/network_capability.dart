@@ -1,4 +1,4 @@
-/// Native Android network capability information for the active network.
+/// Native network capability information for the active network.
 class NetworkCapability {
   /// Creates a network capability description.
   const NetworkCapability({
@@ -13,15 +13,18 @@ class NetworkCapability {
     required this.hasBluetooth,
     required this.hasLowLatency,
     required this.hasHighBandwidth,
+    this.interfaceTypes,
+    this.isConstrained,
+    this.isIosNative = false,
   });
 
-  /// Whether Android reports an active connected network.
+  /// Whether the native platform reports an active connected network.
   final bool isConnected;
 
   /// A readable active transport type summary.
   final String transportType;
 
-  /// Whether Android has validated internet access on the active network.
+  /// Whether the native platform has validated internet access on the active network.
   final bool isValidated;
 
   /// Whether the active network is metered.
@@ -48,6 +51,15 @@ class NetworkCapability {
   /// Whether the active network reports a high-bandwidth capability.
   final bool hasHighBandwidth;
 
+  /// Native interface type names when available.
+  final List<String>? interfaceTypes;
+
+  /// Whether the current network is constrained, such as iOS Low Data Mode.
+  final bool? isConstrained;
+
+  /// Whether this payload came from the iOS native implementation.
+  final bool isIosNative;
+
   /// Creates a [NetworkCapability] from a map returned by the native platform.
   factory NetworkCapability.fromMap(Map<Object?, Object?> map) {
     return NetworkCapability(
@@ -62,6 +74,9 @@ class NetworkCapability {
       hasBluetooth: _readBool(map, 'hasBluetooth'),
       hasLowLatency: _readBool(map, 'hasLowLatency'),
       hasHighBandwidth: _readBool(map, 'hasHighBandwidth'),
+      interfaceTypes: _readOptionalStringList(map, 'interfaceTypes'),
+      isConstrained: _readOptionalBool(map, 'isConstrained'),
+      isIosNative: _readBool(map, 'isIosNative'),
     );
   }
 
@@ -79,6 +94,9 @@ class NetworkCapability {
       'hasBluetooth': hasBluetooth,
       'hasLowLatency': hasLowLatency,
       'hasHighBandwidth': hasHighBandwidth,
+      'isIosNative': isIosNative,
+      'interfaceTypes': ?interfaceTypes,
+      'isConstrained': ?isConstrained,
     };
   }
 
@@ -96,7 +114,10 @@ class NetworkCapability {
         'hasEthernet: $hasEthernet, '
         'hasBluetooth: $hasBluetooth, '
         'hasLowLatency: $hasLowLatency, '
-        'hasHighBandwidth: $hasHighBandwidth'
+        'hasHighBandwidth: $hasHighBandwidth, '
+        'interfaceTypes: $interfaceTypes, '
+        'isConstrained: $isConstrained, '
+        'isIosNative: $isIosNative'
         ')';
   }
 
@@ -108,11 +129,33 @@ class NetworkCapability {
     return false;
   }
 
+  static bool? _readOptionalBool(Map<Object?, Object?> map, String key) {
+    final Object? value = map[key];
+    if (value is bool) {
+      return value;
+    }
+    return null;
+  }
+
   static String _readString(Map<Object?, Object?> map, String key) {
     final Object? value = map[key];
     if (value is String && value.isNotEmpty) {
       return value;
     }
     return 'Unknown';
+  }
+
+  static List<String>? _readOptionalStringList(
+    Map<Object?, Object?> map,
+    String key,
+  ) {
+    final Object? value = map[key];
+    if (value is Iterable<Object?>) {
+      return value
+          .whereType<String>()
+          .where((String item) => item.isNotEmpty)
+          .toList(growable: false);
+    }
+    return null;
   }
 }

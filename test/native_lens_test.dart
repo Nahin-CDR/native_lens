@@ -630,6 +630,9 @@ void main() {
     expect(networkCapability.transportType, 'Wi-Fi');
     expect(networkCapability.isValidated, true);
     expect(networkCapability.hasWifi, true);
+    expect(networkCapability.interfaceTypes, isNull);
+    expect(networkCapability.isConstrained, isNull);
+    expect(networkCapability.isIosNative, false);
   });
 
   test('generateReport', () async {
@@ -1820,6 +1823,9 @@ void main() {
     expect(networkCapability.isConnected, true);
     expect(networkCapability.transportType, 'Wi-Fi');
     expect(networkCapability.hasWifi, true);
+    expect(networkCapability.interfaceTypes, isNull);
+    expect(networkCapability.isConstrained, isNull);
+    expect(networkCapability.isIosNative, false);
   });
 
   test('networkSpeedStream', () async {

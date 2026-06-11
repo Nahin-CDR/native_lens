@@ -87,17 +87,17 @@ abstract class NativeLensPlatform extends PlatformInterface {
     throw UnimplementedError('watchThemeMode() has not been implemented.');
   }
 
-  /// Returns native Android network capability information for the active network.
+  /// Returns native network capability information for the active network.
   Future<NetworkCapability> getNetworkCapability() {
     throw UnimplementedError(
       'getNetworkCapability() has not been implemented.',
     );
   }
 
-  /// Emits native Android network capability updates as the active network changes.
+  /// Emits native network capability updates as the active network changes.
   ///
-  /// This stream listens to Android network callbacks so Wi-Fi, mobile data,
-  /// VPN, and flight mode changes can update the app without a manual refresh.
+  /// This stream listens to native network callbacks so active network changes
+  /// can update the app without a manual refresh.
   Stream<NetworkCapability> get networkCapabilityStream {
     throw UnimplementedError(
       'networkCapabilityStream has not been implemented.',

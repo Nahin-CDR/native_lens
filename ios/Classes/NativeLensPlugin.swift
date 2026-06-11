@@ -307,6 +307,13 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
   private func createNetworkCapability(from path: NWPath) -> [String: Any] {
     let transportTypes = transportTypes(from: path)
     let transportTypeString = transportTypes.isEmpty ? "Unknown" : transportTypes.joined(separator: ", ")
+    let isConstrained: Bool
+
+    if #available(iOS 13.0, *) {
+      isConstrained = path.isConstrained
+    } else {
+      isConstrained = false
+    }
 
     return [
       "isConnected": path.status == .satisfied,
@@ -320,6 +327,9 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
       "hasBluetooth": false,
       "hasLowLatency": false,
       "hasHighBandwidth": false,
+      "interfaceTypes": transportTypes,
+      "isConstrained": isConstrained,
+      "isIosNative": true,
     ]
   }
 
@@ -358,6 +368,9 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
       "hasBluetooth": false,
       "hasLowLatency": false,
       "hasHighBandwidth": false,
+      "interfaceTypes": [String](),
+      "isConstrained": false,
+      "isIosNative": true,
     ]
   }
 

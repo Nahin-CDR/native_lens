@@ -110,7 +110,7 @@ class NativeLens {
     return NativeLensPlatform.instance.watchThemeMode();
   }
 
-  /// Returns native Android network capability information for the active network.
+  /// Returns native network capability information for the active network.
   Future<NetworkCapability> getNetworkCapability() {
     return NativeLensPlatform.instance.getNetworkCapability();
   }

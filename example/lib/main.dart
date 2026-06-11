@@ -619,6 +619,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final NetworkSpeedSample? visibleNetworkSpeedSample = isNetworkConnected
         ? networkSpeedSample
         : _zeroNetworkSpeedSample();
+    final List<String>? networkInterfaceTypes =
+        networkCapability.interfaceTypes;
+    final bool hasNetworkInterfaceTypes =
+        networkInterfaceTypes != null && networkInterfaceTypes.isNotEmpty;
 
     return SingleChildScrollView(
       child: Column(
@@ -762,6 +766,30 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   label: 'Status',
                   value: isNetworkConnected ? 'Connected' : 'Disconnected',
                 ),
+                _SummaryRow(
+                  label: 'Transport',
+                  value: networkCapability.transportType,
+                ),
+                _SummaryRow(
+                  label: 'Validated',
+                  value: networkCapability.isValidated ? 'Yes' : 'No',
+                ),
+                _SummaryRow(
+                  label: 'Metered',
+                  value: networkCapability.isMetered ? 'Yes' : 'No',
+                ),
+                if (networkCapability.isConstrained != null)
+                  _SummaryRow(
+                    label: 'Low Data',
+                    value: networkCapability.isConstrained! ? 'On' : 'Off',
+                  ),
+                if (hasNetworkInterfaceTypes)
+                  _SummaryRow(
+                    label: 'Interfaces',
+                    value: networkInterfaceTypes.join(', '),
+                  ),
+                if (networkCapability.isIosNative)
+                  const _SummaryRow(label: 'iOS Native', value: 'Yes'),
                 _SummaryRow(
                   label: 'Download',
                   value: _formatSpeed(
