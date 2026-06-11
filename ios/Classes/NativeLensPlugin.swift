@@ -150,15 +150,57 @@ public class NativeLensPlugin: NSObject, FlutterPlugin {
 
   private func getPlatformSummary() -> [String: Any] {
     let device = UIDevice.current
+    let processInfo = ProcessInfo.processInfo
+    let isSimulator = isRunningOnSimulator()
+
     return [
       "manufacturer": "Apple",
-      "brand": device.systemName,
+      "brand": "Apple",
       "model": device.model,
       "device": device.localizedModel,
-      "product": device.name,
+      "product": device.model,
       "androidSdk": 0,
       "androidRelease": device.systemVersion,
+      "platformName": "ios",
+      "osName": device.systemName,
+      "osVersion": device.systemVersion,
+      "localizedModel": device.localizedModel,
+      "appEnvironment": isSimulator ? "simulator" : "device",
+      "isPhysicalDevice": !isSimulator,
+      "isSimulator": isSimulator,
+      "physicalMemoryBytes": Int64(processInfo.physicalMemory),
+      "processorCount": processInfo.processorCount,
+      "activeProcessorCount": processInfo.activeProcessorCount,
+      "thermalState": thermalStateName(),
+      "isIosNative": true,
     ]
+  }
+
+  private func isRunningOnSimulator() -> Bool {
+    #if targetEnvironment(simulator)
+      return true
+    #else
+      return false
+    #endif
+  }
+
+  private func thermalStateName() -> String {
+    if #available(iOS 11.0, *) {
+      switch ProcessInfo.processInfo.thermalState {
+      case .nominal:
+        return "nominal"
+      case .fair:
+        return "fair"
+      case .serious:
+        return "serious"
+      case .critical:
+        return "critical"
+      @unknown default:
+        return "unknown"
+      }
+    }
+
+    return "unsupported"
   }
 
   private func getSystemFeatures() -> [[String: Any?]] {

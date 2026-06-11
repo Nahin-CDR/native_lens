@@ -173,6 +173,53 @@ void main() {
     expect(summary.product, 'pixel');
     expect(summary.androidSdk, 35);
     expect(summary.androidRelease, '15');
+    expect(summary.platformName, 'android');
+    expect(summary.osName, 'Android');
+    expect(summary.osVersion, '15');
+    expect(summary.isIosNative, false);
+    expect(summary.localizedModel, isNull);
+    expect(summary.physicalMemoryBytes, isNull);
+  });
+
+  test('PlatformSummary parses iOS native baseline fields', () {
+    final PlatformSummary summary = PlatformSummary.fromMap(<Object?, Object?>{
+      'manufacturer': 'Apple',
+      'brand': 'Apple',
+      'model': 'iPhone',
+      'device': 'iPhone',
+      'product': 'iPhone',
+      'androidSdk': 0,
+      'androidRelease': '18.5',
+      'platformName': 'ios',
+      'osName': 'iOS',
+      'osVersion': '18.5',
+      'localizedModel': 'iPhone',
+      'appEnvironment': 'simulator',
+      'isPhysicalDevice': false,
+      'isSimulator': true,
+      'physicalMemoryBytes': 8589934592,
+      'processorCount': 8,
+      'activeProcessorCount': 6,
+      'thermalState': 'nominal',
+      'isIosNative': true,
+    });
+
+    expect(summary.manufacturer, 'Apple');
+    expect(summary.brand, 'Apple');
+    expect(summary.model, 'iPhone');
+    expect(summary.androidSdk, 0);
+    expect(summary.platformName, 'ios');
+    expect(summary.osName, 'iOS');
+    expect(summary.osVersion, '18.5');
+    expect(summary.localizedModel, 'iPhone');
+    expect(summary.appEnvironment, 'simulator');
+    expect(summary.isPhysicalDevice, false);
+    expect(summary.isSimulator, true);
+    expect(summary.physicalMemoryBytes, 8589934592);
+    expect(summary.processorCount, 8);
+    expect(summary.activeProcessorCount, 6);
+    expect(summary.thermalState, 'nominal');
+    expect(summary.isIosNative, true);
   });
 
   test('getSystemFeatures', () async {

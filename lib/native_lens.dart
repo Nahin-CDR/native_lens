@@ -57,9 +57,9 @@ export 'native_lens_screen_trace.dart';
 export 'screen_debug_info.dart';
 export 'device_orientation_info.dart';
 
-/// Entry point for reading basic native Android information.
+/// Entry point for reading native device and capability information.
 class NativeLens {
-  /// Returns a summary of the Android platform running the app.
+  /// Returns a summary of the native platform running the app.
   Future<PlatformSummary> getPlatformSummary() {
     return NativeLensPlatform.instance.getPlatformSummary();
   }

@@ -1,3 +1,8 @@
+## Unreleased
+
+- Improved iOS platform summary baseline with safe native OS, model, runtime,
+  memory, processor, thermal state, and iOS-native marker fields.
+
 ## 0.13.0
 
 - Added Stream URL Probe Intelligence.

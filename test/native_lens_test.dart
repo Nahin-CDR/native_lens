@@ -499,6 +499,8 @@ void main() {
 
     expect(summary.manufacturer, 'Google');
     expect(summary.androidSdk, 35);
+    expect(summary.platformName, isNull);
+    expect(summary.isIosNative, false);
   });
 
   test('getSystemFeatures', () async {

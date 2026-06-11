@@ -35,7 +35,7 @@ abstract class NativeLensPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  /// Returns a summary of the Android platform running the app.
+  /// Returns a summary of the native platform running the app.
   Future<PlatformSummary> getPlatformSummary() {
     throw UnimplementedError('getPlatformSummary() has not been implemented.');
   }

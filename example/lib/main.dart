@@ -784,12 +784,49 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                _SummaryRow(
+                  label: 'Platform',
+                  value: summary.platformName ?? 'Unknown',
+                ),
                 _SummaryRow(label: 'Manufacturer', value: summary.manufacturer),
                 _SummaryRow(label: 'Model', value: summary.model),
                 _SummaryRow(
-                  label: 'Android Release',
-                  value: summary.androidRelease,
+                  label: 'OS',
+                  value:
+                      '${summary.osName ?? 'Unknown'} '
+                      '${summary.osVersion ?? summary.androidRelease}',
                 ),
+                if (summary.androidSdk > 0)
+                  _SummaryRow(
+                    label: 'Android SDK',
+                    value: summary.androidSdk.toString(),
+                  ),
+                if (summary.localizedModel != null)
+                  _SummaryRow(
+                    label: 'Localized Model',
+                    value: summary.localizedModel!,
+                  ),
+                if (summary.appEnvironment != null)
+                  _SummaryRow(
+                    label: 'Environment',
+                    value: summary.appEnvironment!,
+                  ),
+                if (summary.physicalMemoryBytes != null)
+                  _SummaryRow(
+                    label: 'Memory',
+                    value: _formatBytes(summary.physicalMemoryBytes!),
+                  ),
+                if (summary.processorCount != null)
+                  _SummaryRow(
+                    label: 'Processors',
+                    value: summary.activeProcessorCount == null
+                        ? summary.processorCount.toString()
+                        : '${summary.activeProcessorCount}/${summary.processorCount}',
+                  ),
+                if (summary.thermalState != null)
+                  _SummaryRow(label: 'Thermal', value: summary.thermalState!),
+                if (summary.isIosNative)
+                  const _SummaryRow(label: 'iOS Native', value: 'Yes'),
               ],
             ),
           ),
@@ -856,6 +893,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     final double kiloBytesPerSecond = bytesPerSecond / 1024;
     return '${kiloBytesPerSecond.toStringAsFixed(2)} KB/s';
+  }
+
+  String _formatBytes(int bytes) {
+    final double gibibytes = bytes / (1024 * 1024 * 1024);
+    return '${gibibytes.toStringAsFixed(2)} GiB';
   }
 
   Widget _themeModeSection() {
