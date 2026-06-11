@@ -1,4 +1,6 @@
-## Unreleased
+## 0.14.0
+
+Release date: 2026-06-11
 
 - Added README support matrix for Android and iOS capability coverage,
   fallback behavior, and privacy-safe iOS baseline fields.
