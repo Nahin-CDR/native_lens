@@ -642,7 +642,7 @@ It reads Camera2 metadata only and does not open the camera or capture media.
 
 ## Author
 
-- Portfolio: https://bynahin.onrender.com/
+- Portfolio: https://bynahin.com/
 - Pub.dev: https://pub.dev/packages/native_lens
 
 ## Articles & Announcements
