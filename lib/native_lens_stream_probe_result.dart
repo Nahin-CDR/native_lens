@@ -26,6 +26,7 @@ class NativeLensStreamProbeResult {
     this.elapsedMillis,
     this.manifestByteLength,
     this.errorCode,
+    this.hlsPlaylistType,
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
        segmentUrls = List<String>.unmodifiable(segmentUrls),
        reasons = List<String>.unmodifiable(reasons),
@@ -60,6 +61,17 @@ class NativeLensStreamProbeResult {
 
   /// Whether the response appears to be an HLS manifest.
   final bool isLikelyHls;
+
+  /// HLS playlist classification, or null when the body is not classified.
+  ///
+  /// Expected values are `master`, `media`, and `unknown`.
+  final String? hlsPlaylistType;
+
+  /// Whether the manifest is classified as a master playlist.
+  bool get isMasterPlaylist => hlsPlaylistType == 'master';
+
+  /// Whether the manifest is classified as a media playlist.
+  bool get isMediaPlaylist => hlsPlaylistType == 'media';
 
   /// Whether variant playlist URLs were found.
   final bool hasVariantStreams;
@@ -130,6 +142,7 @@ class NativeLensStreamProbeResult {
       manifestByteLength: _readOptionalInt(map, 'manifestByteLength'),
       probeStage: _readString(map, 'probeStage'),
       errorCode: _readOptionalString(map, 'errorCode'),
+      hlsPlaylistType: _readOptionalString(map, 'hlsPlaylistType'),
     );
   }
 
@@ -160,6 +173,7 @@ class NativeLensStreamProbeResult {
       'manifestByteLength': manifestByteLength,
       'probeStage': probeStage,
       'errorCode': errorCode,
+      'hlsPlaylistType': hlsPlaylistType,
     };
   }
 
@@ -176,6 +190,7 @@ class NativeLensStreamProbeResult {
         'isReachable: $isReachable, '
         'isManifestReadable: $isManifestReadable, '
         'isLikelyHls: $isLikelyHls, '
+        'hlsPlaylistType: $hlsPlaylistType, '
         'hasVariantStreams: $hasVariantStreams, '
         'hasMediaSegments: $hasMediaSegments, '
         'variantUrls: $variantUrls, '

@@ -1756,6 +1756,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             value: result.isLikelyHls ? 'Yes' : 'No',
           ),
           _SummaryRow(
+            label: 'HLS Playlist Type',
+            value: result.hlsPlaylistType ?? 'Not classified',
+          ),
+          _SummaryRow(
             label: 'Variants',
             value: result.variantUrls.length.toString(),
           ),

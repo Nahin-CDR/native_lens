@@ -20,6 +20,7 @@ https://media.example.com/720p/prog_index.m3u8
     );
 
     expect(result.isLikelyHls, isTrue);
+    expect(result.hlsPlaylistType, 'master');
     expect(result.hasVariantStreams, isTrue);
     expect(result.hasMediaSegments, isFalse);
     expect(result.variantUrls, <String>[
@@ -45,6 +46,7 @@ segment-002.ts
     );
 
     expect(result.isLikelyHls, isTrue);
+    expect(result.hlsPlaylistType, 'media');
     expect(result.hasVariantStreams, isFalse);
     expect(result.hasMediaSegments, isTrue);
     expect(result.variantUrls, isEmpty);
@@ -85,6 +87,7 @@ segments/segment-001.m4s
     );
 
     expect(result.isLikelyHls, isFalse);
+    expect(result.hlsPlaylistType, isNull);
     expect(result.hasVariantStreams, isFalse);
     expect(result.hasMediaSegments, isFalse);
     expect(result.variantUrls, isEmpty);
@@ -100,6 +103,7 @@ segments/segment-001.m4s
     );
 
     expect(result.isLikelyHls, isFalse);
+    expect(result.hlsPlaylistType, isNull);
     expect(result.hasVariantStreams, isFalse);
     expect(result.hasMediaSegments, isFalse);
     expect(result.variantUrls, isEmpty);
@@ -150,10 +154,43 @@ not-a-segment.txt
     );
 
     expect(result.isLikelyHls, isTrue);
+    expect(result.hlsPlaylistType, 'unknown');
     expect(result.hasMediaSegments, isTrue);
     expect(result.segmentUrls, <String>[
       'https://cdn.example.com/live/720p/segment-001.ts',
       'https://cdn.example.com/live/720p/caption-001.vtt',
     ]);
+  });
+
+  test('classifies marker-free HLS playlist as unknown', () {
+    final StreamProbeManifestParseResult result = parseStreamProbeManifest(
+      manifestBody: '''
+#EXTM3U
+#EXT-X-VERSION:3
+''',
+      baseUri: baseUri,
+      extractVariantLimit: 10,
+      extractSegmentLimit: 5,
+    );
+
+    expect(result.isLikelyHls, isTrue);
+    expect(result.hlsPlaylistType, 'unknown');
+    expect(result.hasVariantStreams, isFalse);
+    expect(result.hasMediaSegments, isFalse);
+  });
+
+  test('does not classify HLS markers without the playlist header', () {
+    final StreamProbeManifestParseResult result = parseStreamProbeManifest(
+      manifestBody: '''
+#EXT-X-STREAM-INF:BANDWIDTH=800000
+360p/index.m3u8
+''',
+      baseUri: baseUri,
+      extractVariantLimit: 10,
+      extractSegmentLimit: 5,
+    );
+
+    expect(result.isLikelyHls, isTrue);
+    expect(result.hlsPlaylistType, isNull);
   });
 }

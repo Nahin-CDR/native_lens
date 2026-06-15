@@ -57,6 +57,7 @@ void main() {
       isReachable: true,
       isManifestReadable: true,
       isLikelyHls: true,
+      hlsPlaylistType: 'master',
       hasVariantStreams: true,
       hasMediaSegments: false,
       variantUrls: <String>['https://cdn.example.com/live/720p.m3u8'],
@@ -84,6 +85,9 @@ void main() {
       expect(result.isReachable, isTrue);
       expect(result.isManifestReadable, isTrue);
       expect(result.isLikelyHls, isTrue);
+      expect(result.hlsPlaylistType, 'master');
+      expect(result.isMasterPlaylist, isTrue);
+      expect(result.isMediaPlaylist, isFalse);
       expect(result.hasVariantStreams, isTrue);
       expect(result.hasMediaSegments, isFalse);
       expect(result.variantUrls, <String>[
@@ -128,6 +132,7 @@ void main() {
         'manifestByteLength': 512,
         'probeStage': 'manifestParsing',
         'errorCode': null,
+        'hlsPlaylistType': 'master',
       });
     });
 
@@ -145,6 +150,9 @@ void main() {
       expect(decoded.isReachable, result.isReachable);
       expect(decoded.isManifestReadable, result.isManifestReadable);
       expect(decoded.isLikelyHls, result.isLikelyHls);
+      expect(decoded.hlsPlaylistType, result.hlsPlaylistType);
+      expect(decoded.isMasterPlaylist, isTrue);
+      expect(decoded.isMediaPlaylist, isFalse);
       expect(decoded.hasVariantStreams, result.hasVariantStreams);
       expect(decoded.hasMediaSegments, result.hasMediaSegments);
       expect(decoded.variantUrls, result.variantUrls);
@@ -198,6 +206,19 @@ void main() {
       expect(safeResult.reasons, <String>['Manifest is readable.']);
       expect(() => safeResult.variantUrls.add('new'), throwsUnsupportedError);
       expect(() => safeResult.reasons.add('new'), throwsUnsupportedError);
+    });
+
+    test('fromMap keeps old response maps compatible', () {
+      final Map<String, Object?> oldMap = Map<String, Object?>.from(
+        result.toMap(),
+      )..remove('hlsPlaylistType');
+
+      final NativeLensStreamProbeResult decoded =
+          NativeLensStreamProbeResult.fromMap(oldMap);
+
+      expect(decoded.hlsPlaylistType, isNull);
+      expect(decoded.isMasterPlaylist, isFalse);
+      expect(decoded.isMediaPlaylist, isFalse);
     });
 
     test('toString contains url and riskLevel', () {

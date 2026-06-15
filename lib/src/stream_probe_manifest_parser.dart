@@ -3,6 +3,7 @@ class StreamProbeManifestParseResult {
   /// Creates an internal manifest parse result.
   StreamProbeManifestParseResult({
     required this.isLikelyHls,
+    required this.hlsPlaylistType,
     required List<String> variantUrls,
     required List<String> segmentUrls,
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
@@ -10,6 +11,9 @@ class StreamProbeManifestParseResult {
 
   /// Whether the manifest body appears to be an HLS playlist.
   final bool isLikelyHls;
+
+  /// HLS playlist classification derived from manifest markers.
+  final String? hlsPlaylistType;
 
   /// Whether variant playlist URLs were found.
   bool get hasVariantStreams => variantUrls.isNotEmpty;
@@ -38,6 +42,12 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
       .toList();
 
   final bool hasExtM3u = lines.any((String line) => line == '#EXTM3U');
+  final bool hasMasterMarker = lines.any(
+    (String line) => line.startsWith('#EXT-X-STREAM-INF'),
+  );
+  final bool hasMediaMarker = lines.any(
+    (String line) => line.startsWith('#EXTINF'),
+  );
   final bool hasHlsMarker = lines.any(_isHlsMarker);
   final List<String> variantUrls = <String>[];
   final List<String> segmentUrls = <String>[];
@@ -76,9 +86,31 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
 
   return StreamProbeManifestParseResult(
     isLikelyHls: hasExtM3u || hasHlsMarker,
+    hlsPlaylistType: _classifyHlsPlaylist(
+      hasExtM3u: hasExtM3u,
+      hasMasterMarker: hasMasterMarker,
+      hasMediaMarker: hasMediaMarker,
+    ),
     variantUrls: variantUrls,
     segmentUrls: segmentUrls,
   );
+}
+
+String? _classifyHlsPlaylist({
+  required bool hasExtM3u,
+  required bool hasMasterMarker,
+  required bool hasMediaMarker,
+}) {
+  if (!hasExtM3u) {
+    return null;
+  }
+  if (hasMasterMarker) {
+    return 'master';
+  }
+  if (hasMediaMarker) {
+    return 'media';
+  }
+  return 'unknown';
 }
 
 bool _isHlsMarker(String line) {

@@ -1,3 +1,7 @@
+## Unreleased
+
+- Added HLS manifest classification for master, media, and unknown playlists.
+
 ## 0.14.0
 
 Release date: 2026-06-11

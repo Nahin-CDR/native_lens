@@ -74,6 +74,9 @@ void main() {
     expect(result.isReachable, isTrue);
     expect(result.isManifestReadable, isTrue);
     expect(result.isLikelyHls, isTrue);
+    expect(result.hlsPlaylistType, 'master');
+    expect(result.isMasterPlaylist, isTrue);
+    expect(result.isMediaPlaylist, isFalse);
     expect(result.hasVariantStreams, isTrue);
     expect(result.hasMediaSegments, isFalse);
     expect(result.variantUrls, <String>[
@@ -110,6 +113,9 @@ segment-001.ts
     );
 
     expect(result.riskLevel, 'low');
+    expect(result.hlsPlaylistType, 'media');
+    expect(result.isMasterPlaylist, isFalse);
+    expect(result.isMediaPlaylist, isTrue);
     expect(result.finalUrl, 'https://cdn.example.com/live/master.m3u8');
     expect(result.redirectCount, 1);
     expect(client.requestedUrls, <String>[
@@ -174,8 +180,58 @@ segment-001.ts
     expect(result.isReachable, isTrue);
     expect(result.isManifestReadable, isTrue);
     expect(result.isLikelyHls, isFalse);
+    expect(result.hlsPlaylistType, isNull);
+    expect(result.isMasterPlaylist, isFalse);
+    expect(result.isMediaPlaylist, isFalse);
     expect(result.errorCode, 'not_hls_manifest');
   });
+
+  test('classifies marker-free HLS manifest as unknown', () async {
+    final NativeLensStreamProbeResult result = await runStreamProbe(
+      url: 'https://example.com/live/playlist.m3u8',
+      options: const NativeLensStreamProbeOptions(),
+      httpClient: _FakeStreamProbeHttpClient(<String, Object>{
+        'https://example.com/live/playlist.m3u8': _response(
+          statusCode: 200,
+          contentType: 'application/vnd.apple.mpegurl',
+          body: '''
+#EXTM3U
+#EXT-X-VERSION:3
+''',
+        ),
+      }),
+    );
+
+    expect(result.riskLevel, 'medium');
+    expect(result.isLikelyHls, isTrue);
+    expect(result.hlsPlaylistType, 'unknown');
+    expect(result.isMasterPlaylist, isFalse);
+    expect(result.isMediaPlaylist, isFalse);
+    expect(result.errorCode, 'empty_hls_manifest');
+  });
+
+  test(
+    'does not classify non-HLS body from URL and content type hints',
+    () async {
+      final NativeLensStreamProbeResult result = await runStreamProbe(
+        url: 'https://example.com/live/playlist.m3u8',
+        options: const NativeLensStreamProbeOptions(),
+        httpClient: _FakeStreamProbeHttpClient(<String, Object>{
+          'https://example.com/live/playlist.m3u8': _response(
+            statusCode: 200,
+            contentType: 'application/vnd.apple.mpegurl',
+            body: '<html><body>Not a playlist</body></html>',
+          ),
+        }),
+      );
+
+      expect(result.isLikelyHls, isTrue);
+      expect(result.hlsPlaylistType, isNull);
+      expect(result.isMasterPlaylist, isFalse);
+      expect(result.isMediaPlaylist, isFalse);
+      expect(result.errorCode, 'empty_hls_manifest');
+    },
+  );
 
   test('returns high risk when manifest is too large', () async {
     final NativeLensStreamProbeResult result = await runStreamProbe(
