@@ -1,3 +1,4 @@
+import 'hls_media_segment.dart';
 import 'hls_variant_stream.dart';
 
 /// URL and manifest readiness result for a streaming preflight probe.
@@ -30,9 +31,11 @@ class NativeLensStreamProbeResult {
     this.errorCode,
     this.hlsPlaylistType,
     List<HlsVariantStream> hlsVariants = const <HlsVariantStream>[],
+    List<HlsMediaSegment> hlsSegments = const <HlsMediaSegment>[],
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
        hlsVariants = List<HlsVariantStream>.unmodifiable(hlsVariants),
        segmentUrls = List<String>.unmodifiable(segmentUrls),
+       hlsSegments = List<HlsMediaSegment>.unmodifiable(hlsSegments),
        reasons = List<String>.unmodifiable(reasons),
        recommendations = List<String>.unmodifiable(recommendations);
 
@@ -91,6 +94,9 @@ class NativeLensStreamProbeResult {
 
   /// Media segment URLs extracted from the manifest.
   final List<String> segmentUrls;
+
+  /// Metadata parsed from media playlist segment declarations.
+  final List<HlsMediaSegment> hlsSegments;
 
   /// Human-readable reasons for the probe result.
   final List<String> reasons;
@@ -151,6 +157,7 @@ class NativeLensStreamProbeResult {
       errorCode: _readOptionalString(map, 'errorCode'),
       hlsPlaylistType: _readOptionalString(map, 'hlsPlaylistType'),
       hlsVariants: _readHlsVariants(map, 'hlsVariants'),
+      hlsSegments: _readHlsSegments(map, 'hlsSegments'),
     );
   }
 
@@ -185,6 +192,9 @@ class NativeLensStreamProbeResult {
       'hlsVariants': hlsVariants
           .map((HlsVariantStream variant) => variant.toMap())
           .toList(growable: false),
+      'hlsSegments': hlsSegments
+          .map((HlsMediaSegment segment) => segment.toMap())
+          .toList(growable: false),
     };
   }
 
@@ -207,6 +217,7 @@ class NativeLensStreamProbeResult {
         'variantUrls: $variantUrls, '
         'hlsVariants: $hlsVariants, '
         'segmentUrls: $segmentUrls, '
+        'hlsSegments: $hlsSegments, '
         'reasons: $reasons, '
         'recommendations: $recommendations, '
         'userMessage: $userMessage, '
@@ -291,5 +302,23 @@ class NativeLensStreamProbeResult {
       }
     }
     return variants;
+  }
+
+  static List<HlsMediaSegment> _readHlsSegments(
+    Map<Object?, Object?> map,
+    String key,
+  ) {
+    final Object? value = map[key];
+    if (value is! List<Object?>) {
+      return <HlsMediaSegment>[];
+    }
+
+    final List<HlsMediaSegment> segments = <HlsMediaSegment>[];
+    for (final Object? item in value) {
+      if (item is Map<Object?, Object?>) {
+        segments.add(HlsMediaSegment.fromMap(item));
+      }
+    }
+    return segments;
   }
 }

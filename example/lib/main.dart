@@ -1771,6 +1771,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             label: 'Segments',
             value: result.segmentUrls.length.toString(),
           ),
+          _SummaryRow(
+            label: 'Segment Metadata',
+            value: result.hlsSegments.length.toString(),
+          ),
           const SizedBox(height: 8),
           const Text('Reasons', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),

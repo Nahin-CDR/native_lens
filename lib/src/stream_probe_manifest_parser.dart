@@ -1,3 +1,4 @@
+import '../hls_media_segment.dart';
 import '../hls_variant_stream.dart';
 
 /// Basic HLS manifest parse result for internal stream URL probing.
@@ -9,9 +10,11 @@ class StreamProbeManifestParseResult {
     required List<String> variantUrls,
     required List<HlsVariantStream> hlsVariants,
     required List<String> segmentUrls,
+    required List<HlsMediaSegment> hlsSegments,
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
        hlsVariants = List<HlsVariantStream>.unmodifiable(hlsVariants),
-       segmentUrls = List<String>.unmodifiable(segmentUrls);
+       segmentUrls = List<String>.unmodifiable(segmentUrls),
+       hlsSegments = List<HlsMediaSegment>.unmodifiable(hlsSegments);
 
   /// Whether the manifest body appears to be an HLS playlist.
   final bool isLikelyHls;
@@ -33,6 +36,9 @@ class StreamProbeManifestParseResult {
 
   /// Media segment URLs extracted from the manifest.
   final List<String> segmentUrls;
+
+  /// Metadata parsed from media playlist segment declarations.
+  final List<HlsMediaSegment> hlsSegments;
 }
 
 /// Parses a basic HLS manifest for readiness signals.
@@ -59,17 +65,70 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
   final List<String> variantUrls = <String>[];
   final List<HlsVariantStream> hlsVariants = <HlsVariantStream>[];
   final List<String> segmentUrls = <String>[];
+  final List<HlsMediaSegment> hlsSegments = <HlsMediaSegment>[];
+  final bool shouldParseSegmentMetadata =
+      hasExtM3u && hasMediaMarker && !hasMasterMarker;
   bool expectVariantUrl = false;
   bool expectSegmentUrl = false;
   Map<String, String>? pendingVariantAttributes;
+  double? pendingSegmentDuration;
+  String? pendingSegmentTitle;
+  String? pendingByteRange;
+  bool pendingDiscontinuity = false;
+  String? pendingProgramDateTime;
+  int? mediaSequence;
+  int mediaSegmentIndex = 0;
+  String? activeKeyMethod;
+  String? activeKeyUri;
 
   for (final String line in lines) {
     if (line.startsWith('#')) {
-      expectVariantUrl = line.startsWith('#EXT-X-STREAM-INF');
-      pendingVariantAttributes = expectVariantUrl
-          ? _parseAttributeList(_attributeListFromTag(line))
-          : null;
-      expectSegmentUrl = line.startsWith('#EXTINF');
+      if (line.startsWith('#EXT-X-STREAM-INF')) {
+        expectVariantUrl = true;
+        pendingVariantAttributes = _parseAttributeList(
+          _attributeListFromTag(line),
+        );
+        expectSegmentUrl = false;
+        continue;
+      }
+      if (expectVariantUrl) {
+        expectVariantUrl = false;
+        pendingVariantAttributes = null;
+      }
+      if (line.startsWith('#EXTINF')) {
+        expectSegmentUrl = true;
+        final (double?, String?) segmentInfo = _parseExtInf(line);
+        pendingSegmentDuration = segmentInfo.$1;
+        pendingSegmentTitle = segmentInfo.$2;
+        continue;
+      }
+      if (line.startsWith('#EXT-X-MEDIA-SEQUENCE')) {
+        mediaSequence = _parseNonNegativeInt(_valueFromTag(line));
+        continue;
+      }
+      if (line.startsWith('#EXT-X-BYTERANGE')) {
+        pendingByteRange = _nonEmpty(_valueFromTag(line));
+        continue;
+      }
+      if (line == '#EXT-X-DISCONTINUITY') {
+        pendingDiscontinuity = true;
+        continue;
+      }
+      if (line.startsWith('#EXT-X-PROGRAM-DATE-TIME')) {
+        pendingProgramDateTime = _nonEmpty(_valueFromTag(line));
+        continue;
+      }
+      if (line.startsWith('#EXT-X-KEY')) {
+        final Map<String, String> keyAttributes = _parseAttributeList(
+          _attributeListFromTag(line),
+        );
+        activeKeyMethod = _nonEmpty(keyAttributes['METHOD']);
+        activeKeyUri =
+            activeKeyMethod == null || activeKeyMethod.toUpperCase() == 'NONE'
+            ? null
+            : _resolveUrl(line: keyAttributes['URI'], baseUri: baseUri);
+        continue;
+      }
       continue;
     }
 
@@ -96,13 +155,42 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
     }
 
     if (expectSegmentUrl || _looksLikeMediaSegment(line)) {
-      _addResolvedUrl(
+      final bool isDeclaredSegment = expectSegmentUrl;
+      final String? resolvedUrl = _addResolvedUrl(
         urls: segmentUrls,
         line: line,
         baseUri: baseUri,
         limit: extractSegmentLimit,
       );
+      if (shouldParseSegmentMetadata &&
+          isDeclaredSegment &&
+          resolvedUrl != null) {
+        hlsSegments.add(
+          HlsMediaSegment(
+            uri: line,
+            url: resolvedUrl,
+            durationSeconds: pendingSegmentDuration,
+            title: pendingSegmentTitle,
+            byteRange: pendingByteRange,
+            isDiscontinuity: pendingDiscontinuity,
+            programDateTime: pendingProgramDateTime,
+            sequenceNumber: mediaSequence == null
+                ? null
+                : mediaSequence + mediaSegmentIndex,
+            keyMethod: activeKeyMethod,
+            keyUri: activeKeyUri,
+          ),
+        );
+      }
+      if (isDeclaredSegment) {
+        mediaSegmentIndex += 1;
+      }
       expectSegmentUrl = false;
+      pendingSegmentDuration = null;
+      pendingSegmentTitle = null;
+      pendingByteRange = null;
+      pendingDiscontinuity = false;
+      pendingProgramDateTime = null;
     }
   }
 
@@ -116,6 +204,7 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
     variantUrls: variantUrls,
     hlsVariants: hlsVariants,
     segmentUrls: segmentUrls,
+    hlsSegments: hlsSegments,
   );
 }
 
@@ -147,6 +236,26 @@ String _attributeListFromTag(String line) {
     return '';
   }
   return line.substring(separatorIndex + 1);
+}
+
+String _valueFromTag(String line) {
+  final int separatorIndex = line.indexOf(':');
+  if (separatorIndex < 0 || separatorIndex == line.length - 1) {
+    return '';
+  }
+  return line.substring(separatorIndex + 1).trim();
+}
+
+(double?, String?) _parseExtInf(String line) {
+  final String value = _valueFromTag(line);
+  final int separatorIndex = value.indexOf(',');
+  final String durationValue = separatorIndex < 0
+      ? value
+      : value.substring(0, separatorIndex).trim();
+  final String titleValue = separatorIndex < 0
+      ? ''
+      : value.substring(separatorIndex + 1).trim();
+  return (_parseNonNegativeDouble(durationValue), _nonEmpty(titleValue));
 }
 
 Map<String, String> _parseAttributeList(String input) {
@@ -269,10 +378,19 @@ String? _addResolvedUrl({
     return null;
   }
 
-  try {
-    final String resolvedUrl = baseUri.resolve(line).toString();
+  final String? resolvedUrl = _resolveUrl(line: line, baseUri: baseUri);
+  if (resolvedUrl != null) {
     urls.add(resolvedUrl);
-    return resolvedUrl;
+  }
+  return resolvedUrl;
+}
+
+String? _resolveUrl({required String? line, required Uri baseUri}) {
+  if (line == null || line.isEmpty) {
+    return null;
+  }
+  try {
+    return baseUri.resolve(line).toString();
   } on FormatException {
     return null;
   }

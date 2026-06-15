@@ -51,17 +51,26 @@ https://media.example.com/720p/prog_index.m3u8
     expect(result.hlsVariants.last.width, 1280);
     expect(result.hlsVariants.last.height, 720);
     expect(result.segmentUrls, isEmpty);
+    expect(result.hlsSegments, isEmpty);
   });
 
-  test('parses media playlist segments', () {
+  test('parses media playlist segment metadata', () {
     final StreamProbeManifestParseResult result = parseStreamProbeManifest(
       manifestBody: '''
 #EXTM3U
 #EXT-X-TARGETDURATION:6
-#EXTINF:6.0,
+#EXT-X-MEDIA-SEQUENCE:100
+#EXT-X-KEY:METHOD=AES-128,URI="keys/key.bin"
+#EXT-X-PROGRAM-DATE-TIME:2026-06-15T10:00:00.000Z
+#EXT-X-DISCONTINUITY
+#EXTINF:6.006,Opening segment
+#EXT-X-BYTERANGE:75232@0
 segment-001.ts
-#EXTINF:6.0,
+#EXTINF:5.5,Second segment, with comma
 segment-002.ts
+#EXT-X-KEY:METHOD=NONE
+#EXTINF:4.0,
+https://media.example.com/segment-003.m4s
 ''',
       baseUri: Uri.parse('https://cdn.example.com/live/720p/index.m3u8'),
       extractVariantLimit: 10,
@@ -77,7 +86,48 @@ segment-002.ts
     expect(result.segmentUrls, <String>[
       'https://cdn.example.com/live/720p/segment-001.ts',
       'https://cdn.example.com/live/720p/segment-002.ts',
+      'https://media.example.com/segment-003.m4s',
     ]);
+    expect(result.hlsSegments, hasLength(3));
+
+    final firstSegment = result.hlsSegments.first;
+    expect(firstSegment.uri, 'segment-001.ts');
+    expect(
+      firstSegment.url,
+      'https://cdn.example.com/live/720p/segment-001.ts',
+    );
+    expect(firstSegment.durationSeconds, 6.006);
+    expect(firstSegment.title, 'Opening segment');
+    expect(firstSegment.byteRange, '75232@0');
+    expect(firstSegment.isDiscontinuity, isTrue);
+    expect(firstSegment.programDateTime, '2026-06-15T10:00:00.000Z');
+    expect(firstSegment.sequenceNumber, 100);
+    expect(firstSegment.keyMethod, 'AES-128');
+    expect(
+      firstSegment.keyUri,
+      'https://cdn.example.com/live/720p/keys/key.bin',
+    );
+
+    final secondSegment = result.hlsSegments[1];
+    expect(secondSegment.durationSeconds, 5.5);
+    expect(secondSegment.title, 'Second segment, with comma');
+    expect(secondSegment.byteRange, isNull);
+    expect(secondSegment.isDiscontinuity, isFalse);
+    expect(secondSegment.programDateTime, isNull);
+    expect(secondSegment.sequenceNumber, 101);
+    expect(secondSegment.keyMethod, 'AES-128');
+    expect(
+      secondSegment.keyUri,
+      'https://cdn.example.com/live/720p/keys/key.bin',
+    );
+
+    final thirdSegment = result.hlsSegments.last;
+    expect(thirdSegment.url, 'https://media.example.com/segment-003.m4s');
+    expect(thirdSegment.durationSeconds, 4.0);
+    expect(thirdSegment.title, isNull);
+    expect(thirdSegment.sequenceNumber, 102);
+    expect(thirdSegment.keyMethod, 'NONE');
+    expect(thirdSegment.keyUri, isNull);
   });
 
   test('resolves relative URLs against base Uri', () {
@@ -105,6 +155,7 @@ segments/segment-001.m4s
     expect(result.segmentUrls, <String>[
       'https://cdn.example.com/live/master/segments/segment-001.m4s',
     ]);
+    expect(result.hlsSegments, isEmpty);
   });
 
   test('returns empty signals for empty manifest', () {
@@ -122,6 +173,7 @@ segments/segment-001.m4s
     expect(result.variantUrls, isEmpty);
     expect(result.hlsVariants, isEmpty);
     expect(result.segmentUrls, isEmpty);
+    expect(result.hlsSegments, isEmpty);
   });
 
   test('returns non-HLS signals for non-HLS body', () {
@@ -139,6 +191,7 @@ segments/segment-001.m4s
     expect(result.variantUrls, isEmpty);
     expect(result.hlsVariants, isEmpty);
     expect(result.segmentUrls, isEmpty);
+    expect(result.hlsSegments, isEmpty);
   });
 
   test('applies extraction limits', () {
@@ -170,6 +223,7 @@ segment-003.ts
       'https://cdn.example.com/live/segment-001.ts',
       'https://cdn.example.com/live/segment-002.ts',
     ]);
+    expect(result.hlsSegments, isEmpty);
   });
 
   test('parses non-comment media segment lines', () {
@@ -192,6 +246,7 @@ not-a-segment.txt
       'https://cdn.example.com/live/720p/segment-001.ts',
       'https://cdn.example.com/live/720p/caption-001.vtt',
     ]);
+    expect(result.hlsSegments, isEmpty);
   });
 
   test('classifies marker-free HLS playlist as unknown', () {
@@ -225,6 +280,7 @@ not-a-segment.txt
     expect(result.isLikelyHls, isTrue);
     expect(result.hlsPlaylistType, isNull);
     expect(result.hlsVariants, isEmpty);
+    expect(result.hlsSegments, isEmpty);
   });
 
   test('keeps partial metadata and skips unsafe variant URLs', () {
@@ -256,6 +312,68 @@ partial/index.m3u8
     expect(result.variantUrls, <String>[
       'https://cdn.example.com/live/valid/index.m3u8',
       'https://cdn.example.com/live/partial/index.m3u8',
+    ]);
+    expect(result.hlsSegments, isEmpty);
+  });
+
+  test('keeps existing variant extraction behavior when a tag intervenes', () {
+    final StreamProbeManifestParseResult result = parseStreamProbeManifest(
+      manifestBody: '''
+#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=800000
+#EXT-X-VERSION:3
+segment-001.ts
+''',
+      baseUri: baseUri,
+      extractVariantLimit: 10,
+      extractSegmentLimit: 5,
+    );
+
+    expect(result.variantUrls, isEmpty);
+    expect(result.hlsVariants, isEmpty);
+    expect(result.segmentUrls, <String>[
+      'https://cdn.example.com/live/segment-001.ts',
+    ]);
+    expect(result.hlsSegments, isEmpty);
+  });
+
+  test('keeps partial segment metadata and skips unsafe segment URLs', () {
+    final StreamProbeManifestParseResult result = parseStreamProbeManifest(
+      manifestBody: '''
+#EXTM3U
+#EXT-X-MEDIA-SEQUENCE:not-a-number
+#EXT-X-KEY:METHOD=AES-128,URI="http://[invalid"
+#EXTINF:not-a-duration,Partial segment
+valid/segment-001.ts
+#EXT-X-DISCONTINUITY
+#EXT-X-PROGRAM-DATE-TIME:
+#EXT-X-BYTERANGE:
+#EXTINF:-4.0,
+http://[invalid
+#EXT-X-KEY:URI="keys/missing-method.bin"
+#EXTINF:3.0,Final segment
+valid/segment-003.ts
+''',
+      baseUri: Uri.parse('https://cdn.example.com/live/index.m3u8'),
+      extractVariantLimit: 10,
+      extractSegmentLimit: 5,
+    );
+
+    expect(result.hlsSegments, hasLength(2));
+    expect(result.hlsSegments.first.durationSeconds, isNull);
+    expect(result.hlsSegments.first.title, 'Partial segment');
+    expect(result.hlsSegments.first.sequenceNumber, isNull);
+    expect(result.hlsSegments.first.keyMethod, 'AES-128');
+    expect(result.hlsSegments.first.keyUri, isNull);
+    expect(result.hlsSegments.last.durationSeconds, 3.0);
+    expect(result.hlsSegments.last.isDiscontinuity, isFalse);
+    expect(result.hlsSegments.last.programDateTime, isNull);
+    expect(result.hlsSegments.last.byteRange, isNull);
+    expect(result.hlsSegments.last.keyMethod, isNull);
+    expect(result.hlsSegments.last.keyUri, isNull);
+    expect(result.segmentUrls, <String>[
+      'https://cdn.example.com/live/valid/segment-001.ts',
+      'https://cdn.example.com/live/valid/segment-003.ts',
     ]);
   });
 }

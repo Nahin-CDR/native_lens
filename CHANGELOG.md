@@ -2,6 +2,7 @@
 
 - Added HLS manifest classification for master, media, and unknown playlists.
 - Added HLS master playlist variant metadata parsing.
+- Added HLS media playlist segment metadata parsing.
 
 ## 0.14.0
 

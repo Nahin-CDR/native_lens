@@ -1159,6 +1159,7 @@ void main() {
         expect(result.variantUrls.single, endsWith('/360p/index.m3u8'));
         expect(result.hlsVariants, hasLength(1));
         expect(result.hlsVariants.single.bandwidth, 800000);
+        expect(result.hlsSegments, isEmpty);
       },
     );
   });
