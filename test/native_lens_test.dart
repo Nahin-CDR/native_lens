@@ -1157,6 +1157,8 @@ void main() {
         expect(result.isLikelyHls, isTrue);
         expect(result.hasVariantStreams, isTrue);
         expect(result.variantUrls.single, endsWith('/360p/index.m3u8'));
+        expect(result.hlsVariants, hasLength(1));
+        expect(result.hlsVariants.single.bandwidth, 800000);
       },
     );
   });

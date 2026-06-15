@@ -54,7 +54,7 @@ void main() {
             contentType: 'application/vnd.apple.mpegurl',
             body: '''
 #EXTM3U
-#EXT-X-STREAM-INF:BANDWIDTH=800000
+#EXT-X-STREAM-INF:BANDWIDTH=800000,AVERAGE-BANDWIDTH=700000,RESOLUTION=640x360,CODECS="avc1.4d401e,mp4a.40.2"
 360p/index.m3u8
 ''',
           ),
@@ -82,6 +82,12 @@ void main() {
     expect(result.variantUrls, <String>[
       'https://example.com/live/360p/index.m3u8',
     ]);
+    expect(result.hlsVariants, hasLength(1));
+    expect(result.hlsVariants.single.bandwidth, 800000);
+    expect(result.hlsVariants.single.averageBandwidth, 700000);
+    expect(result.hlsVariants.single.width, 640);
+    expect(result.hlsVariants.single.height, 360);
+    expect(result.hlsVariants.single.codecs, 'avc1.4d401e,mp4a.40.2');
     expect(result.probeStage, 'completed');
     expect(result.errorCode, isNull);
     expect(result.elapsedMillis, greaterThanOrEqualTo(0));
@@ -114,6 +120,7 @@ segment-001.ts
 
     expect(result.riskLevel, 'low');
     expect(result.hlsPlaylistType, 'media');
+    expect(result.hlsVariants, isEmpty);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isTrue);
     expect(result.finalUrl, 'https://cdn.example.com/live/master.m3u8');
@@ -181,6 +188,7 @@ segment-001.ts
     expect(result.isManifestReadable, isTrue);
     expect(result.isLikelyHls, isFalse);
     expect(result.hlsPlaylistType, isNull);
+    expect(result.hlsVariants, isEmpty);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isFalse);
     expect(result.errorCode, 'not_hls_manifest');
@@ -205,6 +213,7 @@ segment-001.ts
     expect(result.riskLevel, 'medium');
     expect(result.isLikelyHls, isTrue);
     expect(result.hlsPlaylistType, 'unknown');
+    expect(result.hlsVariants, isEmpty);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isFalse);
     expect(result.errorCode, 'empty_hls_manifest');
@@ -227,6 +236,7 @@ segment-001.ts
 
       expect(result.isLikelyHls, isTrue);
       expect(result.hlsPlaylistType, isNull);
+      expect(result.hlsVariants, isEmpty);
       expect(result.isMasterPlaylist, isFalse);
       expect(result.isMediaPlaylist, isFalse);
       expect(result.errorCode, 'empty_hls_manifest');
@@ -287,6 +297,8 @@ segment-002.ts
     expect(result.variantUrls, <String>[
       'https://example.com/live/360p/index.m3u8',
     ]);
+    expect(result.hlsVariants, hasLength(1));
+    expect(result.hlsVariants.single.bandwidth, 800000);
     expect(result.segmentUrls, <String>[
       'https://example.com/live/segment-001.ts',
     ]);

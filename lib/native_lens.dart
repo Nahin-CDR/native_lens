@@ -32,6 +32,7 @@ import 'native_lens_task.dart';
 export 'camera_capability.dart';
 export 'compatibility_summary.dart';
 export 'display_info.dart';
+export 'hls_variant_stream.dart';
 export 'media_codec_capability.dart';
 export 'native_lens_custom_task_result.dart';
 export 'native_lens_dataset_exporter.dart';

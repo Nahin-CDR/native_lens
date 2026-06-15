@@ -1764,6 +1764,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             value: result.variantUrls.length.toString(),
           ),
           _SummaryRow(
+            label: 'Variant Metadata',
+            value: result.hlsVariants.length.toString(),
+          ),
+          _SummaryRow(
             label: 'Segments',
             value: result.segmentUrls.length.toString(),
           ),

@@ -1,3 +1,5 @@
+import 'hls_variant_stream.dart';
+
 /// URL and manifest readiness result for a streaming preflight probe.
 class NativeLensStreamProbeResult {
   /// Creates a stream probe result.
@@ -27,7 +29,9 @@ class NativeLensStreamProbeResult {
     this.manifestByteLength,
     this.errorCode,
     this.hlsPlaylistType,
+    List<HlsVariantStream> hlsVariants = const <HlsVariantStream>[],
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
+       hlsVariants = List<HlsVariantStream>.unmodifiable(hlsVariants),
        segmentUrls = List<String>.unmodifiable(segmentUrls),
        reasons = List<String>.unmodifiable(reasons),
        recommendations = List<String>.unmodifiable(recommendations);
@@ -81,6 +85,9 @@ class NativeLensStreamProbeResult {
 
   /// Variant playlist URLs extracted from the manifest.
   final List<String> variantUrls;
+
+  /// Metadata parsed from master playlist variant declarations.
+  final List<HlsVariantStream> hlsVariants;
 
   /// Media segment URLs extracted from the manifest.
   final List<String> segmentUrls;
@@ -143,6 +150,7 @@ class NativeLensStreamProbeResult {
       probeStage: _readString(map, 'probeStage'),
       errorCode: _readOptionalString(map, 'errorCode'),
       hlsPlaylistType: _readOptionalString(map, 'hlsPlaylistType'),
+      hlsVariants: _readHlsVariants(map, 'hlsVariants'),
     );
   }
 
@@ -174,6 +182,9 @@ class NativeLensStreamProbeResult {
       'probeStage': probeStage,
       'errorCode': errorCode,
       'hlsPlaylistType': hlsPlaylistType,
+      'hlsVariants': hlsVariants
+          .map((HlsVariantStream variant) => variant.toMap())
+          .toList(growable: false),
     };
   }
 
@@ -194,6 +205,7 @@ class NativeLensStreamProbeResult {
         'hasVariantStreams: $hasVariantStreams, '
         'hasMediaSegments: $hasMediaSegments, '
         'variantUrls: $variantUrls, '
+        'hlsVariants: $hlsVariants, '
         'segmentUrls: $segmentUrls, '
         'reasons: $reasons, '
         'recommendations: $recommendations, '
@@ -261,5 +273,23 @@ class NativeLensStreamProbeResult {
       }
     }
     return values;
+  }
+
+  static List<HlsVariantStream> _readHlsVariants(
+    Map<Object?, Object?> map,
+    String key,
+  ) {
+    final Object? value = map[key];
+    if (value is! List<Object?>) {
+      return <HlsVariantStream>[];
+    }
+
+    final List<HlsVariantStream> variants = <HlsVariantStream>[];
+    for (final Object? item in value) {
+      if (item is Map<Object?, Object?>) {
+        variants.add(HlsVariantStream.fromMap(item));
+      }
+    }
+    return variants;
   }
 }

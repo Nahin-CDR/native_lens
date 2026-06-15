@@ -58,6 +58,16 @@ void main() {
       isManifestReadable: true,
       isLikelyHls: true,
       hlsPlaylistType: 'master',
+      hlsVariants: const <HlsVariantStream>[
+        HlsVariantStream(
+          uri: '720p.m3u8',
+          url: 'https://cdn.example.com/live/720p.m3u8',
+          bandwidth: 1400000,
+          width: 1280,
+          height: 720,
+          codecs: 'avc1.4d401f,mp4a.40.2',
+        ),
+      ],
       hasVariantStreams: true,
       hasMediaSegments: false,
       variantUrls: <String>['https://cdn.example.com/live/720p.m3u8'],
@@ -88,6 +98,8 @@ void main() {
       expect(result.hlsPlaylistType, 'master');
       expect(result.isMasterPlaylist, isTrue);
       expect(result.isMediaPlaylist, isFalse);
+      expect(result.hlsVariants, hasLength(1));
+      expect(result.hlsVariants.single.bandwidth, 1400000);
       expect(result.hasVariantStreams, isTrue);
       expect(result.hasMediaSegments, isFalse);
       expect(result.variantUrls, <String>[
@@ -133,6 +145,22 @@ void main() {
         'probeStage': 'manifestParsing',
         'errorCode': null,
         'hlsPlaylistType': 'master',
+        'hlsVariants': <Map<String, Object?>>[
+          <String, Object?>{
+            'uri': '720p.m3u8',
+            'url': 'https://cdn.example.com/live/720p.m3u8',
+            'bandwidth': 1400000,
+            'averageBandwidth': null,
+            'width': 1280,
+            'height': 720,
+            'codecs': 'avc1.4d401f,mp4a.40.2',
+            'frameRate': null,
+            'audioGroup': null,
+            'subtitlesGroup': null,
+            'closedCaptionsGroup': null,
+            'name': null,
+          },
+        ],
       });
     });
 
@@ -153,6 +181,11 @@ void main() {
       expect(decoded.hlsPlaylistType, result.hlsPlaylistType);
       expect(decoded.isMasterPlaylist, isTrue);
       expect(decoded.isMediaPlaylist, isFalse);
+      expect(decoded.hlsVariants, hasLength(1));
+      expect(
+        decoded.hlsVariants.single.toMap(),
+        result.hlsVariants.single.toMap(),
+      );
       expect(decoded.hasVariantStreams, result.hasVariantStreams);
       expect(decoded.hasMediaSegments, result.hasMediaSegments);
       expect(decoded.variantUrls, result.variantUrls);
@@ -174,6 +207,9 @@ void main() {
         'https://cdn.example.com/live/720p.m3u8',
       ];
       final List<String> reasons = <String>['Manifest is readable.'];
+      final List<HlsVariantStream> hlsVariants = <HlsVariantStream>[
+        const HlsVariantStream(uri: '720p.m3u8'),
+      ];
 
       final NativeLensStreamProbeResult safeResult =
           NativeLensStreamProbeResult(
@@ -185,6 +221,7 @@ void main() {
             isReachable: true,
             isManifestReadable: true,
             isLikelyHls: true,
+            hlsVariants: hlsVariants,
             hasVariantStreams: true,
             hasMediaSegments: false,
             variantUrls: variantUrls,
@@ -199,19 +236,39 @@ void main() {
 
       variantUrls.add('https://cdn.example.com/live/1080p.m3u8');
       reasons.add('Caller mutated the original list.');
+      hlsVariants.add(const HlsVariantStream(uri: '1080p.m3u8'));
 
       expect(safeResult.variantUrls, <String>[
         'https://cdn.example.com/live/720p.m3u8',
       ]);
       expect(safeResult.reasons, <String>['Manifest is readable.']);
+      expect(safeResult.hlsVariants, hasLength(1));
       expect(() => safeResult.variantUrls.add('new'), throwsUnsupportedError);
       expect(() => safeResult.reasons.add('new'), throwsUnsupportedError);
+      expect(
+        () =>
+            safeResult.hlsVariants.add(const HlsVariantStream(uri: 'new.m3u8')),
+        throwsUnsupportedError,
+      );
     });
 
     test('fromMap keeps old response maps compatible', () {
       final Map<String, Object?> oldMap = Map<String, Object?>.from(
         result.toMap(),
-      )..remove('hlsPlaylistType');
+      )..remove('hlsVariants');
+
+      final NativeLensStreamProbeResult decoded =
+          NativeLensStreamProbeResult.fromMap(oldMap);
+
+      expect(decoded.hlsPlaylistType, 'master');
+      expect(decoded.hlsVariants, isEmpty);
+    });
+
+    test('fromMap keeps pre-classification response maps compatible', () {
+      final Map<String, Object?> oldMap =
+          Map<String, Object?>.from(result.toMap())
+            ..remove('hlsPlaylistType')
+            ..remove('hlsVariants');
 
       final NativeLensStreamProbeResult decoded =
           NativeLensStreamProbeResult.fromMap(oldMap);
@@ -219,6 +276,7 @@ void main() {
       expect(decoded.hlsPlaylistType, isNull);
       expect(decoded.isMasterPlaylist, isFalse);
       expect(decoded.isMediaPlaylist, isFalse);
+      expect(decoded.hlsVariants, isEmpty);
     });
 
     test('toString contains url and riskLevel', () {
