@@ -1,4 +1,5 @@
 import '../hls_media_segment.dart';
+import '../hls_playlist_summary.dart';
 import '../hls_variant_stream.dart';
 
 /// Basic HLS manifest parse result for internal stream URL probing.
@@ -11,6 +12,7 @@ class StreamProbeManifestParseResult {
     required List<HlsVariantStream> hlsVariants,
     required List<String> segmentUrls,
     required List<HlsMediaSegment> hlsSegments,
+    required this.hlsPlaylistSummary,
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
        hlsVariants = List<HlsVariantStream>.unmodifiable(hlsVariants),
        segmentUrls = List<String>.unmodifiable(segmentUrls),
@@ -21,6 +23,9 @@ class StreamProbeManifestParseResult {
 
   /// HLS playlist classification derived from manifest markers.
   final String? hlsPlaylistType;
+
+  /// Diagnostics summarized from the parsed HLS playlist.
+  final HlsPlaylistSummary? hlsPlaylistSummary;
 
   /// Whether variant playlist URLs were found.
   bool get hasVariantStreams => variantUrls.isNotEmpty;
@@ -77,9 +82,18 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
   bool pendingDiscontinuity = false;
   String? pendingProgramDateTime;
   int? mediaSequence;
+  double? targetDurationSeconds;
   int mediaSegmentIndex = 0;
   String? activeKeyMethod;
   String? activeKeyUri;
+  bool hasEncryption = false;
+  final bool hasEndList = lines.any((String line) => line == '#EXT-X-ENDLIST');
+  final bool hasDiscontinuity = lines.any(
+    (String line) => line == '#EXT-X-DISCONTINUITY',
+  );
+  final bool hasByteRanges = lines.any(
+    (String line) => line.startsWith('#EXT-X-BYTERANGE'),
+  );
 
   for (final String line in lines) {
     if (line.startsWith('#')) {
@@ -106,6 +120,10 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
         mediaSequence = _parseNonNegativeInt(_valueFromTag(line));
         continue;
       }
+      if (line.startsWith('#EXT-X-TARGETDURATION')) {
+        targetDurationSeconds = _parseNonNegativeDouble(_valueFromTag(line));
+        continue;
+      }
       if (line.startsWith('#EXT-X-BYTERANGE')) {
         pendingByteRange = _nonEmpty(_valueFromTag(line));
         continue;
@@ -123,6 +141,10 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
           _attributeListFromTag(line),
         );
         activeKeyMethod = _nonEmpty(keyAttributes['METHOD']);
+        if (activeKeyMethod != null &&
+            activeKeyMethod.toUpperCase() != 'NONE') {
+          hasEncryption = true;
+        }
         activeKeyUri =
             activeKeyMethod == null || activeKeyMethod.toUpperCase() == 'NONE'
             ? null
@@ -194,17 +216,116 @@ StreamProbeManifestParseResult parseStreamProbeManifest({
     }
   }
 
+  final String? hlsPlaylistType = _classifyHlsPlaylist(
+    hasExtM3u: hasExtM3u,
+    hasMasterMarker: hasMasterMarker,
+    hasMediaMarker: hasMediaMarker,
+  );
+
   return StreamProbeManifestParseResult(
     isLikelyHls: hasExtM3u || hasHlsMarker,
-    hlsPlaylistType: _classifyHlsPlaylist(
-      hasExtM3u: hasExtM3u,
-      hasMasterMarker: hasMasterMarker,
-      hasMediaMarker: hasMediaMarker,
+    hlsPlaylistType: hlsPlaylistType,
+    hlsPlaylistSummary: _buildPlaylistSummary(
+      playlistType: hlsPlaylistType,
+      variants: hlsVariants,
+      segments: hlsSegments,
+      targetDurationSeconds: targetDurationSeconds,
+      mediaSequence: mediaSequence,
+      hasEndList: hasEndList,
+      hasEncryption: hasEncryption,
+      hasDiscontinuity: hasDiscontinuity,
+      hasByteRanges: hasByteRanges,
     ),
     variantUrls: variantUrls,
     hlsVariants: hlsVariants,
     segmentUrls: segmentUrls,
     hlsSegments: hlsSegments,
+  );
+}
+
+HlsPlaylistSummary? _buildPlaylistSummary({
+  required String? playlistType,
+  required List<HlsVariantStream> variants,
+  required List<HlsMediaSegment> segments,
+  required double? targetDurationSeconds,
+  required int? mediaSequence,
+  required bool hasEndList,
+  required bool hasEncryption,
+  required bool hasDiscontinuity,
+  required bool hasByteRanges,
+}) {
+  if (playlistType == null) {
+    return null;
+  }
+
+  final List<int> bandwidths = variants
+      .map((HlsVariantStream variant) => variant.bandwidth)
+      .whereType<int>()
+      .toList(growable: false);
+  final List<int> widths = variants
+      .map((HlsVariantStream variant) => variant.width)
+      .whereType<int>()
+      .toList(growable: false);
+  final List<int> heights = variants
+      .map((HlsVariantStream variant) => variant.height)
+      .whereType<int>()
+      .toList(growable: false);
+  final List<double> durations = segments
+      .map((HlsMediaSegment segment) => segment.durationSeconds)
+      .whereType<double>()
+      .toList(growable: false);
+  final Set<String> codecs = <String>{};
+  for (final HlsVariantStream variant in variants) {
+    for (final String codec in (variant.codecs ?? '').split(',')) {
+      final String normalized = codec.trim();
+      if (normalized.isNotEmpty) {
+        codecs.add(normalized);
+      }
+    }
+  }
+
+  final bool isMediaPlaylist = playlistType == 'media';
+  return HlsPlaylistSummary(
+    playlistType: playlistType,
+    variantCount: variants.length,
+    segmentCount: segments.length,
+    totalDurationSeconds: durations.isEmpty
+        ? null
+        : durations.fold<double>(
+            0,
+            (double total, double duration) => total + duration,
+          ),
+    targetDurationSeconds: targetDurationSeconds,
+    mediaSequence: mediaSequence,
+    isLive: isMediaPlaylist && !hasEndList,
+    isVod: isMediaPlaylist && hasEndList,
+    hasEndList: hasEndList,
+    hasEncryption: hasEncryption,
+    hasDiscontinuity: hasDiscontinuity,
+    hasByteRanges: hasByteRanges,
+    maxBandwidth: _maxInt(bandwidths),
+    minBandwidth: _minInt(bandwidths),
+    maxResolutionWidth: _maxInt(widths),
+    maxResolutionHeight: _maxInt(heights),
+    codecSummary: codecs.toList(growable: false),
+  );
+}
+
+int? _maxInt(List<int> values) {
+  if (values.isEmpty) {
+    return null;
+  }
+  return values.reduce(
+    (int current, int value) => value > current ? value : current,
+  );
+}
+
+int? _minInt(List<int> values) {
+  if (values.isEmpty) {
+    return null;
+  }
+  return values.reduce(
+    (int current, int value) => value < current ? value : current,
   );
 }
 

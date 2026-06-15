@@ -1,4 +1,5 @@
 import 'hls_media_segment.dart';
+import 'hls_playlist_summary.dart';
 import 'hls_variant_stream.dart';
 
 /// URL and manifest readiness result for a streaming preflight probe.
@@ -30,6 +31,7 @@ class NativeLensStreamProbeResult {
     this.manifestByteLength,
     this.errorCode,
     this.hlsPlaylistType,
+    this.hlsPlaylistSummary,
     List<HlsVariantStream> hlsVariants = const <HlsVariantStream>[],
     List<HlsMediaSegment> hlsSegments = const <HlsMediaSegment>[],
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
@@ -73,6 +75,9 @@ class NativeLensStreamProbeResult {
   ///
   /// Expected values are `master`, `media`, and `unknown`.
   final String? hlsPlaylistType;
+
+  /// Diagnostics summarized from the already fetched HLS playlist body.
+  final HlsPlaylistSummary? hlsPlaylistSummary;
 
   /// Whether the manifest is classified as a master playlist.
   bool get isMasterPlaylist => hlsPlaylistType == 'master';
@@ -156,6 +161,7 @@ class NativeLensStreamProbeResult {
       probeStage: _readString(map, 'probeStage'),
       errorCode: _readOptionalString(map, 'errorCode'),
       hlsPlaylistType: _readOptionalString(map, 'hlsPlaylistType'),
+      hlsPlaylistSummary: _readHlsPlaylistSummary(map, 'hlsPlaylistSummary'),
       hlsVariants: _readHlsVariants(map, 'hlsVariants'),
       hlsSegments: _readHlsSegments(map, 'hlsSegments'),
     );
@@ -189,6 +195,7 @@ class NativeLensStreamProbeResult {
       'probeStage': probeStage,
       'errorCode': errorCode,
       'hlsPlaylistType': hlsPlaylistType,
+      'hlsPlaylistSummary': hlsPlaylistSummary?.toMap(),
       'hlsVariants': hlsVariants
           .map((HlsVariantStream variant) => variant.toMap())
           .toList(growable: false),
@@ -212,6 +219,7 @@ class NativeLensStreamProbeResult {
         'isManifestReadable: $isManifestReadable, '
         'isLikelyHls: $isLikelyHls, '
         'hlsPlaylistType: $hlsPlaylistType, '
+        'hlsPlaylistSummary: $hlsPlaylistSummary, '
         'hasVariantStreams: $hasVariantStreams, '
         'hasMediaSegments: $hasMediaSegments, '
         'variantUrls: $variantUrls, '
@@ -302,6 +310,16 @@ class NativeLensStreamProbeResult {
       }
     }
     return variants;
+  }
+
+  static HlsPlaylistSummary? _readHlsPlaylistSummary(
+    Map<Object?, Object?> map,
+    String key,
+  ) {
+    final Object? value = map[key];
+    return value is Map<Object?, Object?>
+        ? HlsPlaylistSummary.fromMap(value)
+        : null;
   }
 
   static List<HlsMediaSegment> _readHlsSegments(

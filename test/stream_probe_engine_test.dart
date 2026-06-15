@@ -89,6 +89,13 @@ void main() {
     expect(result.hlsVariants.single.height, 360);
     expect(result.hlsVariants.single.codecs, 'avc1.4d401e,mp4a.40.2');
     expect(result.hlsSegments, isEmpty);
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.variantCount, 1);
+    expect(result.hlsPlaylistSummary!.maxBandwidth, 800000);
+    expect(result.hlsPlaylistSummary!.codecSummary, <String>[
+      'avc1.4d401e',
+      'mp4a.40.2',
+    ]);
     expect(result.probeStage, 'completed');
     expect(result.errorCode, isNull);
     expect(result.elapsedMillis, greaterThanOrEqualTo(0));
@@ -127,6 +134,11 @@ segment-001.ts
     expect(result.hlsSegments.single.durationSeconds, 6.0);
     expect(result.hlsSegments.single.title, 'Redirected segment');
     expect(result.hlsSegments.single.sequenceNumber, 42);
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.segmentCount, 1);
+    expect(result.hlsPlaylistSummary!.totalDurationSeconds, 6);
+    expect(result.hlsPlaylistSummary!.mediaSequence, 42);
+    expect(result.hlsPlaylistSummary!.isLive, isTrue);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isTrue);
     expect(result.finalUrl, 'https://cdn.example.com/live/master.m3u8');
@@ -196,6 +208,7 @@ segment-001.ts
     expect(result.hlsPlaylistType, isNull);
     expect(result.hlsVariants, isEmpty);
     expect(result.hlsSegments, isEmpty);
+    expect(result.hlsPlaylistSummary, isNull);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isFalse);
     expect(result.errorCode, 'not_hls_manifest');
@@ -222,6 +235,8 @@ segment-001.ts
     expect(result.hlsPlaylistType, 'unknown');
     expect(result.hlsVariants, isEmpty);
     expect(result.hlsSegments, isEmpty);
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.playlistType, 'unknown');
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isFalse);
     expect(result.errorCode, 'empty_hls_manifest');
@@ -246,6 +261,7 @@ segment-001.ts
       expect(result.hlsPlaylistType, isNull);
       expect(result.hlsVariants, isEmpty);
       expect(result.hlsSegments, isEmpty);
+      expect(result.hlsPlaylistSummary, isNull);
       expect(result.isMasterPlaylist, isFalse);
       expect(result.isMediaPlaylist, isFalse);
       expect(result.errorCode, 'empty_hls_manifest');

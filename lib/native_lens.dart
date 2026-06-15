@@ -33,6 +33,7 @@ export 'camera_capability.dart';
 export 'compatibility_summary.dart';
 export 'display_info.dart';
 export 'hls_media_segment.dart';
+export 'hls_playlist_summary.dart';
 export 'hls_variant_stream.dart';
 export 'media_codec_capability.dart';
 export 'native_lens_custom_task_result.dart';

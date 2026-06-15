@@ -58,6 +58,15 @@ void main() {
       isManifestReadable: true,
       isLikelyHls: true,
       hlsPlaylistType: 'master',
+      hlsPlaylistSummary: HlsPlaylistSummary(
+        playlistType: 'master',
+        variantCount: 1,
+        maxBandwidth: 1400000,
+        minBandwidth: 1400000,
+        maxResolutionWidth: 1280,
+        maxResolutionHeight: 720,
+        codecSummary: <String>['avc1.4d401f', 'mp4a.40.2'],
+      ),
       hlsVariants: const <HlsVariantStream>[
         HlsVariantStream(
           uri: '720p.m3u8',
@@ -107,6 +116,8 @@ void main() {
       expect(result.hlsPlaylistType, 'master');
       expect(result.isMasterPlaylist, isTrue);
       expect(result.isMediaPlaylist, isFalse);
+      expect(result.hlsPlaylistSummary, isNotNull);
+      expect(result.hlsPlaylistSummary!.variantCount, 1);
       expect(result.hlsVariants, hasLength(1));
       expect(result.hlsVariants.single.bandwidth, 1400000);
       expect(result.hlsSegments, hasLength(1));
@@ -156,6 +167,25 @@ void main() {
         'probeStage': 'manifestParsing',
         'errorCode': null,
         'hlsPlaylistType': 'master',
+        'hlsPlaylistSummary': <String, Object?>{
+          'playlistType': 'master',
+          'variantCount': 1,
+          'segmentCount': 0,
+          'totalDurationSeconds': null,
+          'targetDurationSeconds': null,
+          'mediaSequence': null,
+          'isLive': false,
+          'isVod': false,
+          'hasEndList': false,
+          'hasEncryption': false,
+          'hasDiscontinuity': false,
+          'hasByteRanges': false,
+          'maxBandwidth': 1400000,
+          'minBandwidth': 1400000,
+          'maxResolutionWidth': 1280,
+          'maxResolutionHeight': 720,
+          'codecSummary': <String>['avc1.4d401f', 'mp4a.40.2'],
+        },
         'hlsVariants': <Map<String, Object?>>[
           <String, Object?>{
             'uri': '720p.m3u8',
@@ -206,6 +236,10 @@ void main() {
       expect(decoded.hlsPlaylistType, result.hlsPlaylistType);
       expect(decoded.isMasterPlaylist, isTrue);
       expect(decoded.isMediaPlaylist, isFalse);
+      expect(
+        decoded.hlsPlaylistSummary!.toMap(),
+        result.hlsPlaylistSummary!.toMap(),
+      );
       expect(decoded.hlsVariants, hasLength(1));
       expect(
         decoded.hlsVariants.single.toMap(),
@@ -295,9 +329,10 @@ void main() {
     });
 
     test('fromMap keeps old response maps compatible', () {
-      final Map<String, Object?> oldMap = Map<String, Object?>.from(
-        result.toMap(),
-      )..remove('hlsSegments');
+      final Map<String, Object?> oldMap =
+          Map<String, Object?>.from(result.toMap())
+            ..remove('hlsSegments')
+            ..remove('hlsPlaylistSummary');
 
       final NativeLensStreamProbeResult decoded =
           NativeLensStreamProbeResult.fromMap(oldMap);
@@ -305,12 +340,14 @@ void main() {
       expect(decoded.hlsPlaylistType, 'master');
       expect(decoded.hlsVariants, hasLength(1));
       expect(decoded.hlsSegments, isEmpty);
+      expect(decoded.hlsPlaylistSummary, isNull);
     });
 
     test('fromMap keeps pre-classification response maps compatible', () {
       final Map<String, Object?> oldMap =
           Map<String, Object?>.from(result.toMap())
             ..remove('hlsPlaylistType')
+            ..remove('hlsPlaylistSummary')
             ..remove('hlsVariants')
             ..remove('hlsSegments');
 
@@ -322,6 +359,7 @@ void main() {
       expect(decoded.isMediaPlaylist, isFalse);
       expect(decoded.hlsVariants, isEmpty);
       expect(decoded.hlsSegments, isEmpty);
+      expect(decoded.hlsPlaylistSummary, isNull);
     });
 
     test('toString contains url and riskLevel', () {

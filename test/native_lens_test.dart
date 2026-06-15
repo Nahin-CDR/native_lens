@@ -1160,6 +1160,9 @@ void main() {
         expect(result.hlsVariants, hasLength(1));
         expect(result.hlsVariants.single.bandwidth, 800000);
         expect(result.hlsSegments, isEmpty);
+        expect(result.hlsPlaylistSummary, isNotNull);
+        expect(result.hlsPlaylistSummary!.playlistType, 'master');
+        expect(result.hlsPlaylistSummary!.variantCount, 1);
       },
     );
   });
@@ -1189,6 +1192,7 @@ void main() {
         expect(result.isReachable, isTrue);
         expect(result.isManifestReadable, isTrue);
         expect(result.isLikelyHls, isFalse);
+        expect(result.hlsPlaylistSummary, isNull);
         expect(result.errorCode, 'not_hls_manifest');
         expect(result.recommendations.single, contains('fallback'));
       },

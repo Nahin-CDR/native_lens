@@ -52,6 +52,18 @@ https://media.example.com/720p/prog_index.m3u8
     expect(result.hlsVariants.last.height, 720);
     expect(result.segmentUrls, isEmpty);
     expect(result.hlsSegments, isEmpty);
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.playlistType, 'master');
+    expect(result.hlsPlaylistSummary!.variantCount, 2);
+    expect(result.hlsPlaylistSummary!.segmentCount, 0);
+    expect(result.hlsPlaylistSummary!.maxBandwidth, 1400000);
+    expect(result.hlsPlaylistSummary!.minBandwidth, 800000);
+    expect(result.hlsPlaylistSummary!.maxResolutionWidth, 1280);
+    expect(result.hlsPlaylistSummary!.maxResolutionHeight, 720);
+    expect(result.hlsPlaylistSummary!.codecSummary, <String>[
+      'avc1.4d401e',
+      'mp4a.40.2',
+    ]);
   });
 
   test('parses media playlist segment metadata', () {
@@ -128,6 +140,44 @@ https://media.example.com/segment-003.m4s
     expect(thirdSegment.sequenceNumber, 102);
     expect(thirdSegment.keyMethod, 'NONE');
     expect(thirdSegment.keyUri, isNull);
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.playlistType, 'media');
+    expect(result.hlsPlaylistSummary!.variantCount, 0);
+    expect(result.hlsPlaylistSummary!.segmentCount, 3);
+    expect(
+      result.hlsPlaylistSummary!.totalDurationSeconds,
+      closeTo(15.506, 0.0001),
+    );
+    expect(result.hlsPlaylistSummary!.targetDurationSeconds, 6);
+    expect(result.hlsPlaylistSummary!.mediaSequence, 100);
+    expect(result.hlsPlaylistSummary!.isLive, isTrue);
+    expect(result.hlsPlaylistSummary!.isVod, isFalse);
+    expect(result.hlsPlaylistSummary!.hasEndList, isFalse);
+    expect(result.hlsPlaylistSummary!.hasEncryption, isTrue);
+    expect(result.hlsPlaylistSummary!.hasDiscontinuity, isTrue);
+    expect(result.hlsPlaylistSummary!.hasByteRanges, isTrue);
+  });
+
+  test('detects VOD media playlists from ENDLIST', () {
+    final StreamProbeManifestParseResult result = parseStreamProbeManifest(
+      manifestBody: '''
+#EXTM3U
+#EXT-X-TARGETDURATION:4
+#EXTINF:4.0,
+segment-001.ts
+#EXT-X-ENDLIST
+''',
+      baseUri: baseUri,
+      extractVariantLimit: 10,
+      extractSegmentLimit: 5,
+    );
+
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.isLive, isFalse);
+    expect(result.hlsPlaylistSummary!.isVod, isTrue);
+    expect(result.hlsPlaylistSummary!.hasEndList, isTrue);
+    expect(result.hlsPlaylistSummary!.totalDurationSeconds, 4);
+    expect(result.hlsPlaylistSummary!.targetDurationSeconds, 4);
   });
 
   test('resolves relative URLs against base Uri', () {
@@ -174,6 +224,7 @@ segments/segment-001.m4s
     expect(result.hlsVariants, isEmpty);
     expect(result.segmentUrls, isEmpty);
     expect(result.hlsSegments, isEmpty);
+    expect(result.hlsPlaylistSummary, isNull);
   });
 
   test('returns non-HLS signals for non-HLS body', () {
@@ -192,6 +243,7 @@ segments/segment-001.m4s
     expect(result.hlsVariants, isEmpty);
     expect(result.segmentUrls, isEmpty);
     expect(result.hlsSegments, isEmpty);
+    expect(result.hlsPlaylistSummary, isNull);
   });
 
   test('applies extraction limits', () {
@@ -264,6 +316,12 @@ not-a-segment.txt
     expect(result.hlsPlaylistType, 'unknown');
     expect(result.hasVariantStreams, isFalse);
     expect(result.hasMediaSegments, isFalse);
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.playlistType, 'unknown');
+    expect(result.hlsPlaylistSummary!.variantCount, 0);
+    expect(result.hlsPlaylistSummary!.segmentCount, 0);
+    expect(result.hlsPlaylistSummary!.isLive, isFalse);
+    expect(result.hlsPlaylistSummary!.isVod, isFalse);
   });
 
   test('does not classify HLS markers without the playlist header', () {
@@ -281,6 +339,7 @@ not-a-segment.txt
     expect(result.hlsPlaylistType, isNull);
     expect(result.hlsVariants, isEmpty);
     expect(result.hlsSegments, isEmpty);
+    expect(result.hlsPlaylistSummary, isNull);
   });
 
   test('keeps partial metadata and skips unsafe variant URLs', () {
@@ -375,5 +434,11 @@ valid/segment-003.ts
       'https://cdn.example.com/live/valid/segment-001.ts',
       'https://cdn.example.com/live/valid/segment-003.ts',
     ]);
+    expect(result.hlsPlaylistSummary, isNotNull);
+    expect(result.hlsPlaylistSummary!.targetDurationSeconds, isNull);
+    expect(result.hlsPlaylistSummary!.mediaSequence, isNull);
+    expect(result.hlsPlaylistSummary!.segmentCount, 2);
+    expect(result.hlsPlaylistSummary!.totalDurationSeconds, 3);
+    expect(result.hlsPlaylistSummary!.hasEncryption, isTrue);
   });
 }
