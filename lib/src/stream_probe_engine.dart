@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../hls_segment_reachability.dart';
 import '../native_lens_stream_probe_options.dart';
 import '../native_lens_stream_probe_result.dart';
 import 'stream_probe_manifest_parser.dart';
@@ -13,6 +14,7 @@ class StreamProbeHttpResponse {
     required this.statusCode,
     required this.bodyBytes,
     this.contentType,
+    this.contentLength,
     this.location,
   });
 
@@ -25,6 +27,9 @@ class StreamProbeHttpResponse {
   /// Response content type, when available.
   final String? contentType;
 
+  /// Response content length, when available.
+  final int? contentLength;
+
   /// Redirect location header, when available.
   final String? location;
 }
@@ -33,6 +38,13 @@ class StreamProbeHttpResponse {
 abstract class StreamProbeHttpClient {
   /// Fetches the URL and returns a response without automatically redirecting.
   Future<StreamProbeHttpResponse> get(
+    Uri uri, {
+    required Map<String, String> headers,
+    required Duration timeout,
+  });
+
+  /// Sends a HEAD request without automatically following redirects.
+  Future<StreamProbeHttpResponse> head(
     Uri uri, {
     required Map<String, String> headers,
     required Duration timeout,
@@ -312,6 +324,13 @@ Future<NativeLensStreamProbeResult> runStreamProbe({
     );
   }
 
+  final HlsSegmentReachability? firstSegmentReachability =
+      await _checkFirstSegmentReachability(
+        client: client,
+        parseResult: parseResult,
+        options: options,
+      );
+
   final bool hasPlaylistEntries =
       parseResult.hasVariantStreams || parseResult.hasMediaSegments;
   if (!hasPlaylistEntries) {
@@ -328,6 +347,7 @@ Future<NativeLensStreamProbeResult> runStreamProbe({
       isLikelyHls: true,
       hlsPlaylistType: parseResult.hlsPlaylistType,
       hlsPlaylistSummary: parseResult.hlsPlaylistSummary,
+      firstSegmentReachability: firstSegmentReachability,
       hlsVariants: parseResult.hlsVariants,
       hlsSegments: parseResult.hlsSegments,
       hasVariantStreams: false,
@@ -365,6 +385,7 @@ Future<NativeLensStreamProbeResult> runStreamProbe({
     isLikelyHls: true,
     hlsPlaylistType: parseResult.hlsPlaylistType,
     hlsPlaylistSummary: parseResult.hlsPlaylistSummary,
+    firstSegmentReachability: firstSegmentReachability,
     hlsVariants: parseResult.hlsVariants,
     hlsSegments: parseResult.hlsSegments,
     hasVariantStreams: parseResult.hasVariantStreams,
@@ -386,6 +407,83 @@ Future<NativeLensStreamProbeResult> runStreamProbe({
     manifestByteLength: manifestByteLength,
     probeStage: 'completed',
   );
+}
+
+Future<HlsSegmentReachability?> _checkFirstSegmentReachability({
+  required StreamProbeHttpClient client,
+  required StreamProbeManifestParseResult parseResult,
+  required NativeLensStreamProbeOptions options,
+}) async {
+  if (!options.checkFirstHlsSegment ||
+      parseResult.hlsPlaylistType != 'media' ||
+      parseResult.hlsSegments.isEmpty) {
+    return null;
+  }
+
+  final String? segmentUrl = parseResult.hlsSegments.first.url;
+  if (segmentUrl == null || segmentUrl.isEmpty) {
+    return const HlsSegmentReachability(
+      checked: false,
+      method: 'HEAD',
+      errorType: 'missing_segment_url',
+      errorMessage: 'The first HLS media segment did not include a URL.',
+    );
+  }
+
+  final Uri? segmentUri = Uri.tryParse(segmentUrl);
+  if (segmentUri == null || !segmentUri.hasScheme || segmentUri.host.isEmpty) {
+    return HlsSegmentReachability(
+      checked: false,
+      url: segmentUrl,
+      method: 'HEAD',
+      errorType: 'invalid_segment_url',
+      errorMessage: 'The first HLS media segment URL is invalid.',
+    );
+  }
+
+  final Duration timeout = _firstSegmentTimeout(options.timeout);
+  final Stopwatch stopwatch = Stopwatch()..start();
+  try {
+    final StreamProbeHttpResponse response = await client
+        .head(segmentUri, headers: options.headers, timeout: timeout)
+        .timeout(timeout);
+    stopwatch.stop();
+    return HlsSegmentReachability(
+      checked: true,
+      url: segmentUrl,
+      method: 'HEAD',
+      isReachable: response.statusCode >= 200 && response.statusCode < 300,
+      statusCode: response.statusCode,
+      contentType: response.contentType,
+      contentLength: response.contentLength,
+      responseTimeMs: stopwatch.elapsedMilliseconds,
+    );
+  } on TimeoutException {
+    stopwatch.stop();
+    return HlsSegmentReachability(
+      checked: true,
+      url: segmentUrl,
+      method: 'HEAD',
+      responseTimeMs: stopwatch.elapsedMilliseconds,
+      errorType: 'timeout',
+      errorMessage: 'First HLS media segment reachability check timed out.',
+    );
+  } on Object catch (error) {
+    stopwatch.stop();
+    return HlsSegmentReachability(
+      checked: true,
+      url: segmentUrl,
+      method: 'HEAD',
+      responseTimeMs: stopwatch.elapsedMilliseconds,
+      errorType: 'http_error',
+      errorMessage: 'First HLS media segment reachability check failed: $error',
+    );
+  }
+}
+
+Duration _firstSegmentTimeout(Duration manifestTimeout) {
+  const Duration maxTimeout = Duration(seconds: 3);
+  return manifestTimeout <= maxTimeout ? manifestTimeout : maxTimeout;
 }
 
 NativeLensStreamProbeResult _failureResult({
@@ -455,12 +553,43 @@ class _DartStreamProbeHttpClient implements StreamProbeHttpClient {
     required Map<String, String> headers,
     required Duration timeout,
   }) async {
+    return _request(
+      uri,
+      method: 'GET',
+      headers: headers,
+      timeout: timeout,
+      readBody: true,
+    );
+  }
+
+  @override
+  Future<StreamProbeHttpResponse> head(
+    Uri uri, {
+    required Map<String, String> headers,
+    required Duration timeout,
+  }) async {
+    return _request(
+      uri,
+      method: 'HEAD',
+      headers: headers,
+      timeout: timeout,
+      readBody: false,
+    );
+  }
+
+  Future<StreamProbeHttpResponse> _request(
+    Uri uri, {
+    required String method,
+    required Map<String, String> headers,
+    required Duration timeout,
+    required bool readBody,
+  }) async {
     final HttpClient client = HttpClient();
     client.connectionTimeout = timeout;
 
     try {
       final HttpClientRequest request = await client
-          .getUrl(uri)
+          .openUrl(method, uri)
           .timeout(timeout);
       request.followRedirects = false;
 
@@ -471,17 +600,22 @@ class _DartStreamProbeHttpClient implements StreamProbeHttpClient {
       final HttpClientResponse response = await request.close().timeout(
         timeout,
       );
-      final List<int> bodyBytes = await response
-          .fold<List<int>>(<int>[], (List<int> bytes, List<int> chunk) {
-            bytes.addAll(chunk);
-            return bytes;
-          })
-          .timeout(timeout);
+      final List<int> bodyBytes = readBody
+          ? await response
+                .fold<List<int>>(<int>[], (List<int> bytes, List<int> chunk) {
+                  bytes.addAll(chunk);
+                  return bytes;
+                })
+                .timeout(timeout)
+          : const <int>[];
 
       return StreamProbeHttpResponse(
         statusCode: response.statusCode,
         bodyBytes: bodyBytes,
         contentType: response.headers.contentType?.toString(),
+        contentLength: response.contentLength >= 0
+            ? response.contentLength
+            : null,
         location: response.headers.value(HttpHeaders.locationHeader),
       );
     } finally {

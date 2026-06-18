@@ -4,6 +4,7 @@
 - Added HLS master playlist variant metadata parsing.
 - Added HLS media playlist segment metadata parsing.
 - Added HLS playlist diagnostics summaries for master, media, and unknown playlists.
+- Added opt-in first HLS media segment reachability diagnostics.
 
 ## 0.14.0
 

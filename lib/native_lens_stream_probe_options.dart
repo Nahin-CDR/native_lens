@@ -8,6 +8,7 @@ class NativeLensStreamProbeOptions {
     this.maxManifestBytes = 1024 * 1024,
     this.extractSegmentLimit = 5,
     this.extractVariantLimit = 10,
+    this.checkFirstHlsSegment = false,
     this.requireHttps = false,
     this.allowedSchemes = const <String>['http', 'https'],
     this.headers = const <String, String>{},
@@ -30,6 +31,11 @@ class NativeLensStreamProbeOptions {
 
   /// Maximum number of variant playlist URLs to extract from the manifest.
   final int extractVariantLimit;
+
+  /// Whether to issue one bounded HEAD request for the first parsed HLS segment.
+  ///
+  /// Disabled by default so existing probes perform no extra network request.
+  final bool checkFirstHlsSegment;
 
   /// Whether the input and final stream URL must use HTTPS.
   final bool requireHttps;

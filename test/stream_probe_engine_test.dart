@@ -102,6 +102,34 @@ void main() {
     expect(result.manifestByteLength, greaterThan(0));
   });
 
+  test('does not check segments for master playlists when opted in', () async {
+    final _FakeStreamProbeHttpClient client =
+        _FakeStreamProbeHttpClient(<String, Object>{
+          'https://example.com/live/master.m3u8': _response(
+            statusCode: 200,
+            contentType: 'application/vnd.apple.mpegurl',
+            body: '''
+#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=800000
+360p/index.m3u8
+''',
+          ),
+        });
+
+    final NativeLensStreamProbeResult result = await runStreamProbe(
+      url: 'https://example.com/live/master.m3u8',
+      options: const NativeLensStreamProbeOptions(checkFirstHlsSegment: true),
+      httpClient: client,
+    );
+
+    expect(result.hlsPlaylistType, 'master');
+    expect(result.firstSegmentReachability, isNull);
+    expect(client.requestedUrls, <String>[
+      'https://example.com/live/master.m3u8',
+    ]);
+    expect(client.requestedMethods, <String>['GET']);
+  });
+
   test('follows redirects using options', () async {
     final _FakeStreamProbeHttpClient client =
         _FakeStreamProbeHttpClient(<String, Object>{
@@ -139,6 +167,7 @@ segment-001.ts
     expect(result.hlsPlaylistSummary!.totalDurationSeconds, 6);
     expect(result.hlsPlaylistSummary!.mediaSequence, 42);
     expect(result.hlsPlaylistSummary!.isLive, isTrue);
+    expect(result.firstSegmentReachability, isNull);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isTrue);
     expect(result.finalUrl, 'https://cdn.example.com/live/master.m3u8');
@@ -147,6 +176,132 @@ segment-001.ts
       'https://example.com/live/master.m3u8',
       'https://cdn.example.com/live/master.m3u8',
     ]);
+    expect(client.requestedMethods, <String>['GET', 'GET']);
+  });
+
+  test('checks first media segment with HEAD when opted in', () async {
+    final _FakeStreamProbeHttpClient client =
+        _FakeStreamProbeHttpClient(<String, Object>{
+          'https://example.com/live/index.m3u8': _response(
+            statusCode: 200,
+            contentType: 'application/vnd.apple.mpegurl',
+            body: '''
+#EXTM3U
+#EXTINF:6.0,First segment
+segment-001.ts
+#EXTINF:6.0,Second segment
+segment-002.ts
+''',
+          ),
+          'HEAD https://example.com/live/segment-001.ts': _response(
+            statusCode: 200,
+            contentType: 'video/mp2t',
+            contentLength: 75232,
+          ),
+        });
+
+    final NativeLensStreamProbeResult result = await runStreamProbe(
+      url: 'https://example.com/live/index.m3u8',
+      options: const NativeLensStreamProbeOptions(checkFirstHlsSegment: true),
+      httpClient: client,
+    );
+
+    expect(result.riskLevel, 'low');
+    expect(result.hlsSegments, hasLength(2));
+    expect(result.firstSegmentReachability, isNotNull);
+    expect(result.firstSegmentReachability!.checked, isTrue);
+    expect(
+      result.firstSegmentReachability!.url,
+      'https://example.com/live/segment-001.ts',
+    );
+    expect(result.firstSegmentReachability!.method, 'HEAD');
+    expect(result.firstSegmentReachability!.isReachable, isTrue);
+    expect(result.firstSegmentReachability!.statusCode, 200);
+    expect(result.firstSegmentReachability!.contentType, 'video/mp2t');
+    expect(result.firstSegmentReachability!.contentLength, 75232);
+    expect(
+      result.firstSegmentReachability!.responseTimeMs,
+      greaterThanOrEqualTo(0),
+    );
+    expect(result.firstSegmentReachability!.errorType, isNull);
+    expect(client.requestedUrls, <String>[
+      'https://example.com/live/index.m3u8',
+      'https://example.com/live/segment-001.ts',
+    ]);
+    expect(client.requestedMethods, <String>['GET', 'HEAD']);
+  });
+
+  test(
+    'does not fallback when first segment HEAD is method not allowed',
+    () async {
+      final _FakeStreamProbeHttpClient client =
+          _FakeStreamProbeHttpClient(<String, Object>{
+            'https://example.com/live/index.m3u8': _response(
+              statusCode: 200,
+              contentType: 'application/vnd.apple.mpegurl',
+              body: '''
+#EXTM3U
+#EXTINF:6.0,
+segment-001.ts
+''',
+            ),
+            'HEAD https://example.com/live/segment-001.ts': _response(
+              statusCode: 405,
+              contentType: 'text/plain',
+            ),
+          });
+
+      final NativeLensStreamProbeResult result = await runStreamProbe(
+        url: 'https://example.com/live/index.m3u8',
+        options: const NativeLensStreamProbeOptions(checkFirstHlsSegment: true),
+        httpClient: client,
+      );
+
+      expect(result.riskLevel, 'low');
+      expect(result.firstSegmentReachability, isNotNull);
+      expect(result.firstSegmentReachability!.checked, isTrue);
+      expect(result.firstSegmentReachability!.method, 'HEAD');
+      expect(result.firstSegmentReachability!.isReachable, isFalse);
+      expect(result.firstSegmentReachability!.statusCode, 405);
+      expect(result.firstSegmentReachability!.errorType, isNull);
+      expect(client.requestedMethods, <String>['GET', 'HEAD']);
+    },
+  );
+
+  test('records first segment timeout as diagnostics', () async {
+    final _FakeStreamProbeHttpClient client =
+        _FakeStreamProbeHttpClient(<String, Object>{
+          'https://example.com/live/index.m3u8': _response(
+            statusCode: 200,
+            contentType: 'application/vnd.apple.mpegurl',
+            body: '''
+#EXTM3U
+#EXTINF:6.0,
+segment-001.ts
+''',
+          ),
+          'HEAD https://example.com/live/segment-001.ts': TimeoutException(
+            'slow segment',
+          ),
+        });
+
+    final NativeLensStreamProbeResult result = await runStreamProbe(
+      url: 'https://example.com/live/index.m3u8',
+      options: const NativeLensStreamProbeOptions(checkFirstHlsSegment: true),
+      httpClient: client,
+    );
+
+    expect(result.riskLevel, 'low');
+    expect(result.errorCode, isNull);
+    expect(result.firstSegmentReachability, isNotNull);
+    expect(result.firstSegmentReachability!.checked, isTrue);
+    expect(result.firstSegmentReachability!.isReachable, isFalse);
+    expect(result.firstSegmentReachability!.statusCode, isNull);
+    expect(result.firstSegmentReachability!.errorType, 'timeout');
+    expect(
+      result.firstSegmentReachability!.responseTimeMs,
+      greaterThanOrEqualTo(0),
+    );
   });
 
   test('returns high risk for HTTP 404', () async {
@@ -187,16 +342,19 @@ segment-001.ts
   });
 
   test('returns medium risk for non-HLS body', () async {
+    final _FakeStreamProbeHttpClient client =
+        _FakeStreamProbeHttpClient(<String, Object>{
+          'https://example.com/index.html': _response(
+            statusCode: 200,
+            contentType: 'text/html',
+            body: '<html><body>Not a playlist</body></html>',
+          ),
+        });
+
     final NativeLensStreamProbeResult result = await runStreamProbe(
       url: 'https://example.com/index.html',
-      options: const NativeLensStreamProbeOptions(),
-      httpClient: _FakeStreamProbeHttpClient(<String, Object>{
-        'https://example.com/index.html': _response(
-          statusCode: 200,
-          contentType: 'text/html',
-          body: '<html><body>Not a playlist</body></html>',
-        ),
-      }),
+      options: const NativeLensStreamProbeOptions(checkFirstHlsSegment: true),
+      httpClient: client,
     );
 
     expect(result.riskLevel, 'medium');
@@ -209,15 +367,17 @@ segment-001.ts
     expect(result.hlsVariants, isEmpty);
     expect(result.hlsSegments, isEmpty);
     expect(result.hlsPlaylistSummary, isNull);
+    expect(result.firstSegmentReachability, isNull);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isFalse);
     expect(result.errorCode, 'not_hls_manifest');
+    expect(client.requestedMethods, <String>['GET']);
   });
 
   test('classifies marker-free HLS manifest as unknown', () async {
     final NativeLensStreamProbeResult result = await runStreamProbe(
       url: 'https://example.com/live/playlist.m3u8',
-      options: const NativeLensStreamProbeOptions(),
+      options: const NativeLensStreamProbeOptions(checkFirstHlsSegment: true),
       httpClient: _FakeStreamProbeHttpClient(<String, Object>{
         'https://example.com/live/playlist.m3u8': _response(
           statusCode: 200,
@@ -237,6 +397,7 @@ segment-001.ts
     expect(result.hlsSegments, isEmpty);
     expect(result.hlsPlaylistSummary, isNotNull);
     expect(result.hlsPlaylistSummary!.playlistType, 'unknown');
+    expect(result.firstSegmentReachability, isNull);
     expect(result.isMasterPlaylist, isFalse);
     expect(result.isMediaPlaylist, isFalse);
     expect(result.errorCode, 'empty_hls_manifest');
@@ -262,6 +423,7 @@ segment-001.ts
       expect(result.hlsVariants, isEmpty);
       expect(result.hlsSegments, isEmpty);
       expect(result.hlsPlaylistSummary, isNull);
+      expect(result.firstSegmentReachability, isNull);
       expect(result.isMasterPlaylist, isFalse);
       expect(result.isMediaPlaylist, isFalse);
       expect(result.errorCode, 'empty_hls_manifest');
@@ -334,6 +496,7 @@ segment-002.ts
 StreamProbeHttpResponse _response({
   required int statusCode,
   String? contentType,
+  int? contentLength,
   String? body,
   String? location,
 }) {
@@ -341,6 +504,7 @@ StreamProbeHttpResponse _response({
     statusCode: statusCode,
     bodyBytes: utf8.encode(body ?? ''),
     contentType: contentType,
+    contentLength: contentLength,
     location: location,
   );
 }
@@ -350,6 +514,7 @@ class _FakeStreamProbeHttpClient implements StreamProbeHttpClient {
 
   final Map<String, Object> responses;
   final List<String> requestedUrls = <String>[];
+  final List<String> requestedMethods = <String>[];
 
   @override
   Future<StreamProbeHttpResponse> get(
@@ -357,8 +522,23 @@ class _FakeStreamProbeHttpClient implements StreamProbeHttpClient {
     required Map<String, String> headers,
     required Duration timeout,
   }) async {
+    return _request('GET', uri);
+  }
+
+  @override
+  Future<StreamProbeHttpResponse> head(
+    Uri uri, {
+    required Map<String, String> headers,
+    required Duration timeout,
+  }) async {
+    return _request('HEAD', uri);
+  }
+
+  Future<StreamProbeHttpResponse> _request(String method, Uri uri) async {
+    requestedMethods.add(method);
     requestedUrls.add(uri.toString());
-    final Object? response = responses[uri.toString()];
+    final Object? response =
+        responses['$method ${uri.toString()}'] ?? responses[uri.toString()];
     if (response is TimeoutException) {
       throw response;
     }

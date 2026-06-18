@@ -13,6 +13,7 @@ void main() {
       expect(options.maxManifestBytes, 1024 * 1024);
       expect(options.extractSegmentLimit, 5);
       expect(options.extractVariantLimit, 10);
+      expect(options.checkFirstHlsSegment, isFalse);
       expect(options.requireHttps, isFalse);
       expect(options.allowedSchemes, <String>['http', 'https']);
       expect(options.headers, isEmpty);
@@ -26,6 +27,7 @@ void main() {
         maxManifestBytes: 2048,
         extractSegmentLimit: 3,
         extractVariantLimit: 4,
+        checkFirstHlsSegment: true,
         requireHttps: true,
         allowedSchemes: <String>['https'],
         headers: <String, String>{'Authorization': 'Bearer token'},
@@ -37,6 +39,7 @@ void main() {
       expect(options.maxManifestBytes, 2048);
       expect(options.extractSegmentLimit, 3);
       expect(options.extractVariantLimit, 4);
+      expect(options.checkFirstHlsSegment, isTrue);
       expect(options.requireHttps, isTrue);
       expect(options.allowedSchemes, <String>['https']);
       expect(options.headers, <String, String>{
@@ -66,6 +69,16 @@ void main() {
         maxResolutionWidth: 1280,
         maxResolutionHeight: 720,
         codecSummary: <String>['avc1.4d401f', 'mp4a.40.2'],
+      ),
+      firstSegmentReachability: const HlsSegmentReachability(
+        checked: true,
+        url: 'https://cdn.example.com/live/segment-100.ts',
+        method: 'HEAD',
+        isReachable: true,
+        statusCode: 200,
+        contentType: 'video/mp2t',
+        contentLength: 75232,
+        responseTimeMs: 42,
       ),
       hlsVariants: const <HlsVariantStream>[
         HlsVariantStream(
@@ -118,6 +131,9 @@ void main() {
       expect(result.isMediaPlaylist, isFalse);
       expect(result.hlsPlaylistSummary, isNotNull);
       expect(result.hlsPlaylistSummary!.variantCount, 1);
+      expect(result.firstSegmentReachability, isNotNull);
+      expect(result.firstSegmentReachability!.checked, isTrue);
+      expect(result.firstSegmentReachability!.method, 'HEAD');
       expect(result.hlsVariants, hasLength(1));
       expect(result.hlsVariants.single.bandwidth, 1400000);
       expect(result.hlsSegments, hasLength(1));
@@ -186,6 +202,18 @@ void main() {
           'maxResolutionHeight': 720,
           'codecSummary': <String>['avc1.4d401f', 'mp4a.40.2'],
         },
+        'firstSegmentReachability': <String, Object?>{
+          'checked': true,
+          'url': 'https://cdn.example.com/live/segment-100.ts',
+          'method': 'HEAD',
+          'isReachable': true,
+          'statusCode': 200,
+          'contentType': 'video/mp2t',
+          'contentLength': 75232,
+          'responseTimeMs': 42,
+          'errorType': null,
+          'errorMessage': null,
+        },
         'hlsVariants': <Map<String, Object?>>[
           <String, Object?>{
             'uri': '720p.m3u8',
@@ -239,6 +267,10 @@ void main() {
       expect(
         decoded.hlsPlaylistSummary!.toMap(),
         result.hlsPlaylistSummary!.toMap(),
+      );
+      expect(
+        decoded.firstSegmentReachability!.toMap(),
+        result.firstSegmentReachability!.toMap(),
       );
       expect(decoded.hlsVariants, hasLength(1));
       expect(
@@ -332,7 +364,8 @@ void main() {
       final Map<String, Object?> oldMap =
           Map<String, Object?>.from(result.toMap())
             ..remove('hlsSegments')
-            ..remove('hlsPlaylistSummary');
+            ..remove('hlsPlaylistSummary')
+            ..remove('firstSegmentReachability');
 
       final NativeLensStreamProbeResult decoded =
           NativeLensStreamProbeResult.fromMap(oldMap);
@@ -341,6 +374,7 @@ void main() {
       expect(decoded.hlsVariants, hasLength(1));
       expect(decoded.hlsSegments, isEmpty);
       expect(decoded.hlsPlaylistSummary, isNull);
+      expect(decoded.firstSegmentReachability, isNull);
     });
 
     test('fromMap keeps pre-classification response maps compatible', () {
@@ -348,6 +382,7 @@ void main() {
           Map<String, Object?>.from(result.toMap())
             ..remove('hlsPlaylistType')
             ..remove('hlsPlaylistSummary')
+            ..remove('firstSegmentReachability')
             ..remove('hlsVariants')
             ..remove('hlsSegments');
 
@@ -360,6 +395,7 @@ void main() {
       expect(decoded.hlsVariants, isEmpty);
       expect(decoded.hlsSegments, isEmpty);
       expect(decoded.hlsPlaylistSummary, isNull);
+      expect(decoded.firstSegmentReachability, isNull);
     });
 
     test('toString contains url and riskLevel', () {

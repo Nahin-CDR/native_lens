@@ -1,5 +1,6 @@
 import 'hls_media_segment.dart';
 import 'hls_playlist_summary.dart';
+import 'hls_segment_reachability.dart';
 import 'hls_variant_stream.dart';
 
 /// URL and manifest readiness result for a streaming preflight probe.
@@ -32,6 +33,7 @@ class NativeLensStreamProbeResult {
     this.errorCode,
     this.hlsPlaylistType,
     this.hlsPlaylistSummary,
+    this.firstSegmentReachability,
     List<HlsVariantStream> hlsVariants = const <HlsVariantStream>[],
     List<HlsMediaSegment> hlsSegments = const <HlsMediaSegment>[],
   }) : variantUrls = List<String>.unmodifiable(variantUrls),
@@ -78,6 +80,9 @@ class NativeLensStreamProbeResult {
 
   /// Diagnostics summarized from the already fetched HLS playlist body.
   final HlsPlaylistSummary? hlsPlaylistSummary;
+
+  /// Optional diagnostics from an opt-in first HLS segment reachability check.
+  final HlsSegmentReachability? firstSegmentReachability;
 
   /// Whether the manifest is classified as a master playlist.
   bool get isMasterPlaylist => hlsPlaylistType == 'master';
@@ -162,6 +167,10 @@ class NativeLensStreamProbeResult {
       errorCode: _readOptionalString(map, 'errorCode'),
       hlsPlaylistType: _readOptionalString(map, 'hlsPlaylistType'),
       hlsPlaylistSummary: _readHlsPlaylistSummary(map, 'hlsPlaylistSummary'),
+      firstSegmentReachability: _readHlsSegmentReachability(
+        map,
+        'firstSegmentReachability',
+      ),
       hlsVariants: _readHlsVariants(map, 'hlsVariants'),
       hlsSegments: _readHlsSegments(map, 'hlsSegments'),
     );
@@ -196,6 +205,7 @@ class NativeLensStreamProbeResult {
       'errorCode': errorCode,
       'hlsPlaylistType': hlsPlaylistType,
       'hlsPlaylistSummary': hlsPlaylistSummary?.toMap(),
+      'firstSegmentReachability': firstSegmentReachability?.toMap(),
       'hlsVariants': hlsVariants
           .map((HlsVariantStream variant) => variant.toMap())
           .toList(growable: false),
@@ -220,6 +230,7 @@ class NativeLensStreamProbeResult {
         'isLikelyHls: $isLikelyHls, '
         'hlsPlaylistType: $hlsPlaylistType, '
         'hlsPlaylistSummary: $hlsPlaylistSummary, '
+        'firstSegmentReachability: $firstSegmentReachability, '
         'hasVariantStreams: $hasVariantStreams, '
         'hasMediaSegments: $hasMediaSegments, '
         'variantUrls: $variantUrls, '
@@ -338,5 +349,15 @@ class NativeLensStreamProbeResult {
       }
     }
     return segments;
+  }
+
+  static HlsSegmentReachability? _readHlsSegmentReachability(
+    Map<Object?, Object?> map,
+    String key,
+  ) {
+    final Object? value = map[key];
+    return value is Map<Object?, Object?>
+        ? HlsSegmentReachability.fromMap(value)
+        : null;
   }
 }

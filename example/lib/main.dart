@@ -74,6 +74,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _streamingDisallowPowerSaveMode = false;
   bool _streamProbeFollowRedirects = true;
   bool _streamProbeRequireHttps = false;
+  bool _streamProbeCheckFirstSegment = false;
   bool _customRequiresCamera = true;
   bool _customRequiresMicrophone = false;
   bool _customRequiresStableNetwork = false;
@@ -518,6 +519,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           timeout: Duration(seconds: timeoutSeconds),
           followRedirects: _streamProbeFollowRedirects,
           requireHttps: _streamProbeRequireHttps,
+          checkFirstHlsSegment: _streamProbeCheckFirstSegment,
         ),
       );
     } catch (error) {
@@ -1498,6 +1500,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     });
                   },
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Check first HLS segment'),
+            subtitle: const Text('Opt-in; sends one bounded HEAD request.'),
+            value: _streamProbeCheckFirstSegment,
+            onChanged: _isProbingStreamUrl
+                ? null
+                : (bool value) {
+                    setState(() {
+                      _streamProbeCheckFirstSegment = value;
+                    });
+                  },
+          ),
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: _isProbingStreamUrl ? null : probeStreamUrl,
@@ -1784,6 +1799,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           _SummaryRow(
             label: 'Segment Metadata',
             value: result.hlsSegments.length.toString(),
+          ),
+          _SummaryRow(
+            label: 'First Segment',
+            value: result.firstSegmentReachability == null
+                ? 'Not checked'
+                : result.firstSegmentReachability!.isReachable
+                ? 'Reachable'
+                : 'Not reachable',
           ),
           const SizedBox(height: 8),
           const Text('Reasons', style: TextStyle(fontWeight: FontWeight.w600)),
