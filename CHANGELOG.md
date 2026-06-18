@@ -5,6 +5,7 @@
 - Added HLS media playlist segment metadata parsing.
 - Added HLS playlist diagnostics summaries for master, media, and unknown playlists.
 - Added opt-in first HLS media segment reachability diagnostics.
+- Updated README guidance for HLS streaming probe diagnostics and safe defaults.
 
 ## 0.14.0
 

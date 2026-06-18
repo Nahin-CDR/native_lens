@@ -1502,8 +1502,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Check first HLS segment'),
-            subtitle: const Text('Opt-in; sends one bounded HEAD request.'),
+            title: const Text('Check first HLS segment (extra request)'),
+            subtitle: const Text(
+              'Opt-in; sends one bounded HTTP HEAD request.',
+            ),
             value: _streamProbeCheckFirstSegment,
             onChanged: _isProbingStreamUrl
                 ? null

@@ -26,6 +26,7 @@ heavy dashboard layer.
 - App-level network speed stream based on this app UID traffic.
 - Full NativeLens report aggregation.
 - Offline compatibility summary using simple Dart rules.
+- Stream URL and HLS manifest probe diagnostics from Dart.
 
 ## Installation
 
@@ -391,7 +392,7 @@ instance, AVPlayer item, or end-to-end playback pipeline.
 
 Use `probeStreamingUrl()` when you want to know whether a stream URL is
 reachable and appears to contain a readable HLS manifest before playback
-startup.
+startup. The probe reads the manifest body only by default.
 
 ```dart
 final result = await NativeLens().probeStreamingUrl(
@@ -400,6 +401,7 @@ final result = await NativeLens().probeStreamingUrl(
     timeout: Duration(seconds: 8),
     followRedirects: true,
     requireHttps: true,
+    checkFirstHlsSegment: false,
   ),
 );
 
@@ -414,7 +416,42 @@ if (result.riskLevel == 'low') {
 
 The probe can report URL validation, HTTP status, final URL after redirects,
 content type hints, manifest readability, likely HLS signals, and extracted
-variant or segment URL counts.
+variant or segment URL counts. For readable HLS manifests it can also expose:
+
+- `hlsPlaylistType`: `master`, `media`, or `unknown`.
+- `hlsVariants`: metadata from master playlist `#EXT-X-STREAM-INF` entries,
+  including bandwidth, resolution, codecs, frame rate, and rendition groups
+  when present.
+- `hlsSegments`: metadata from media playlist segment entries, including
+  duration, title, byte range, discontinuity, program date time, sequence
+  number, and active key method/URI when present.
+- `hlsPlaylistSummary`: safe aggregate diagnostics such as variant/segment
+  counts, total parsed duration, target duration, media sequence, live/VOD
+  state, encryption/discontinuity/byte-range flags, bandwidth range, max
+  resolution, and codec summary.
+
+By default NativeLens does not fetch variant playlists or media segments. To
+check the first parsed media segment, enable the opt-in segment check:
+
+```dart
+final result = await NativeLens().probeStreamingUrl(
+  url: 'https://example.com/media.m3u8',
+  options: const NativeLensStreamProbeOptions(
+    checkFirstHlsSegment: true,
+  ),
+);
+
+final firstSegment = result.firstSegmentReachability;
+if (firstSegment?.checked == true && firstSegment?.isReachable == true) {
+  // The first parsed media segment responded to the bounded HEAD check.
+}
+```
+
+`checkFirstHlsSegment` performs at most one bounded HTTP `HEAD` request for the
+first parsed media segment URL. Segment check failures, timeouts, unsupported
+methods, and malformed values are reported as nullable/defaulted diagnostics;
+they do not throw a probe failure or change the manifest probe into a playback
+guarantee.
 
 This does not validate DRM, CDN correctness, ExoPlayer, AVPlayer, decoder
 initialization, segment playback, or the full playback pipeline.
