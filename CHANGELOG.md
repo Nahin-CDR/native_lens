@@ -1,11 +1,14 @@
-## Unreleased
+## 0.15.0
 
-- Added HLS manifest classification for master, media, and unknown playlists.
-- Added HLS master playlist variant metadata parsing.
-- Added HLS media playlist segment metadata parsing.
-- Added HLS playlist diagnostics summaries for master, media, and unknown playlists.
-- Added opt-in first HLS media segment reachability diagnostics.
-- Updated README guidance for HLS streaming probe diagnostics and safe defaults.
+Release date: 2026-06-18
+
+- Added HLS playlist classification for master, media, and unknown playlists.
+- Added typed HLS master playlist variant metadata parsing.
+- Added typed HLS media playlist segment metadata parsing.
+- Added HLS playlist diagnostics summaries.
+- Added opt-in first HLS media segment reachability diagnostics using one
+  bounded HTTP HEAD request.
+- Updated Stream URL Probe README guidance and example app copy.
 
 ## 0.14.0
 
