@@ -1,12 +1,20 @@
-## Unreleased
+## 0.16.0
 
-- Added README guidance for the `dart run native_lens:icon` launcher icon
-  command, including config fields, platform flags, backup location, rollback
-  behavior, Android adaptive icon handling, and iOS AppIcon generation.
-- Documented the Android 12+/Samsung One UI splash fallback caveat where some
-  OEMs may show the launcher icon instead of the custom splash animated icon.
-- Documented the splash dry-run warning for default Flutter launcher/AppIcon
-  assets and the recommended `dart run native_lens:icon` follow-up.
+Release date: 2026-07-08
+
+- Added `dart run native_lens:icon` for native launcher icon generation.
+- Added Android launcher icon generation, including legacy mipmap icons,
+  adaptive icons, adaptive background color/image support, and optional
+  monochrome icon support.
+- Added iOS AppIcon generation, including AppIcon PNGs, Contents.json, and
+  1024x1024 marketing icon.
+- Added backup/rollback support for icon generation.
+- Added image validation warnings for non-square source icons and opaque
+  adaptive foreground layers.
+- Added splash warnings when default Flutter launcher/AppIcon assets are
+  detected, helping avoid Android 12+/Samsung One UI splash fallback
+  mismatches.
+- Documented the recommended icon and splash setup flow.
 
 ## 0.15.0
 
