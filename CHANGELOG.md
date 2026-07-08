@@ -1,3 +1,12 @@
+## 0.16.1
+
+Release date: 2026-07-08
+
+- Migrated Android Gradle configuration to avoid Flutter's Kotlin Gradle Plugin
+  warning in consuming apps.
+- Preserved compatibility with older AGP versions by only applying the legacy
+  Kotlin Gradle Plugin when required.
+
 ## 0.16.0
 
 Release date: 2026-07-08
