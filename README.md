@@ -43,10 +43,10 @@ Then run:
 flutter pub get
 ```
 
-## Native Splash Setup Preview
+## Native Splash Setup
 
-NativeLens includes an early setup command for native splash screen
-configuration. Start with a dry run:
+NativeLens includes a setup command for native splash screen configuration.
+Start with a dry run:
 
 ```sh
 dart run native_lens:splash --dry-run
@@ -84,6 +84,86 @@ If generation fails mid-run, NativeLens restores the files from the current
 backup automatically. iOS generation updates the static launch screen storyboard
 and writes a `NativeLensSplash.imageset` asset catalog entry; the LaunchScreen
 stays static and launch-screen safe.
+
+### Android 12+ Launcher Icon Fallback Caveat
+
+On Android 12+, some OEM splash implementations, including Samsung One UI, may
+fall back to showing the app launcher icon instead of the custom
+`windowSplashScreenAnimatedIcon`. If the launcher icon is still Flutter's
+default template icon, users can see Flutter branding during launch even when
+NativeLens generated the splash resources correctly.
+
+`dart run native_lens:splash --dry-run` warns when it detects stock Flutter
+launcher icons in the Android or iOS native project. Customize your launcher
+icons with `dart run native_lens:icon` or another icon workflow so the launcher
+and splash branding stay consistent.
+
+## Native Launcher Icon Setup
+
+NativeLens can generate native launcher icons from Flutter-side config in your
+app `pubspec.yaml`.
+
+Start with a dry run:
+
+```sh
+dart run native_lens:icon --dry-run
+```
+
+Add an icon config to your app `pubspec.yaml`:
+
+```yaml
+native_lens:
+  icon:
+    image: assets/icon/icon.png
+    adaptive_background: "#4F8F83"
+    adaptive_foreground: assets/icon/icon_foreground.png
+    monochrome: assets/icon/icon_monochrome.png
+    remove_alpha_ios: true
+    android: true
+    ios: true
+```
+
+Then generate both platforms:
+
+```sh
+dart run native_lens:icon
+```
+
+You can limit generation to one platform:
+
+```sh
+dart run native_lens:icon --android
+dart run native_lens:icon --ios
+```
+
+The `image` file is required. For Android, `adaptive_background` is required
+when Android icon generation is enabled and must be either `#RRGGBB`,
+`#AARRGGBB`, or an image path. `adaptive_foreground` is also required for
+Android icon generation and should be a transparent PNG glyph layer for best
+adaptive icon results. `monochrome` is optional and is used for Android
+monochrome launcher icon support when present.
+
+For iOS-only generation, only `image` is required. `remove_alpha_ios` is
+optional, defaults to `true`, and flattens generated AppIcon PNG alpha onto a
+white background. Set it to `false` only if you intentionally want to preserve
+source alpha; NativeLens warns when transparent pixels remain.
+
+Android generation writes legacy launcher PNGs, adaptive foreground resources,
+adaptive icon XML, and the adaptive background color or image. iOS generation
+writes the AppIcon PNG set and deterministic `Contents.json` under:
+
+```text
+ios/Runner/Assets.xcassets/AppIcon.appiconset/
+```
+
+Before native icon files are changed, NativeLens creates a backup under:
+
+```text
+.native_lens_backup/icon/<timestamp>/
+```
+
+If icon generation fails mid-run, NativeLens restores files from the current
+backup automatically.
 
 ## Platform Support
 

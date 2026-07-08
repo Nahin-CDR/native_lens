@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:crypto/crypto.dart';
+import 'package:native_lens/src/backup.dart';
 import 'package:yaml/yaml.dart';
 
 class NativeLensSplashException implements Exception {
@@ -89,25 +91,7 @@ class NativeLensSplashGenerationResult {
   final List<String> warnings;
 }
 
-class NativeLensSplashBackupEntry {
-  const NativeLensSplashBackupEntry({
-    required this.relativePath,
-    required this.existed,
-    required this.backupRelativePath,
-  });
-
-  final String relativePath;
-  final bool existed;
-  final String? backupRelativePath;
-
-  Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'relativePath': relativePath,
-      'existed': existed,
-      'backupRelativePath': backupRelativePath,
-    };
-  }
-}
+typedef NativeLensSplashBackupEntry = NativeLensBackupEntry;
 
 typedef StdoutWriter = void Function(String message);
 
@@ -125,6 +109,50 @@ const List<String> iosPlannedRelativePaths = <String>[
   'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/Contents.json',
   'ios/Runner/Assets.xcassets/NativeLensSplash.imageset/native_lens_splash.png',
 ];
+
+const List<String> _androidLauncherIconRelativePaths = <String>[
+  'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png',
+  'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png',
+  'android/app/src/main/res/mipmap-xhdpi/ic_launcher.png',
+  'android/app/src/main/res/mipmap-hdpi/ic_launcher.png',
+  'android/app/src/main/res/mipmap-mdpi/ic_launcher.png',
+];
+
+const String _iosMarketingIconRelativePath =
+    'ios/Runner/Assets.xcassets/AppIcon.appiconset/'
+    'Icon-App-1024x1024@1x.png';
+
+// SHA-256 hashes for stock Flutter template launcher icons. These are used
+// only to warn when a project still appears to use Flutter's default branding.
+const Set<String> _stockFlutterAndroidLauncherIconSha256 = <String>{
+  // mipmap-mdpi/ic_launcher.png
+  'c7c0c0189145e4e32a401c61c9bdc615754b0264e7afae24e834bb81049eaf81',
+  // mipmap-hdpi/ic_launcher.png
+  '6a7c8f0d703e3682108f9662f813302236240d3f8f638bb391e32bfb96055fef',
+  // mipmap-xhdpi/ic_launcher.png
+  'e14aa40904929bf313fded22cf7e7ffcbf1d1aac4263b5ef1be8bfce650397aa',
+  // mipmap-xxhdpi/ic_launcher.png
+  '4d470bf22d5c17d84edc5f82516d1ba8a1c09559cd761cefb792f86d9f52b540',
+  // mipmap-xxxhdpi/ic_launcher.png
+  '3c34e1f298d0c9ea3455d46db6b7759c8211a49e9ec6e44b635fc5c87dfb4180',
+};
+
+// SHA-256 hash for Flutter's stock iOS AppIcon marketing image.
+const Set<String> _stockFlutterIosMarketingIconSha256 = <String>{
+  '7770183009e914112de7d8ef1d235a6a30c5834424858e0d2f8253f6b8d31926',
+};
+
+const String _defaultAndroidLauncherIconWarning =
+    'Your Android launcher icon still appears to be the default Flutter '
+    'template icon. Some OEMs, including Samsung One UI, may fall back to '
+    'showing the launcher icon instead of your custom splash icon on Android '
+    "12+. Run 'dart run native_lens:icon' or otherwise customize your "
+    'launcher icon to avoid a mismatched splash.';
+
+const String _defaultIosAppIconWarning =
+    'Your iOS AppIcon still appears to be the default Flutter template icon. '
+    "Run 'dart run native_lens:icon' or otherwise customize your AppIcon so "
+    'launcher and splash branding stay consistent.';
 
 Future<int> runNativeLensSplash(
   List<String> arguments, {
@@ -467,6 +495,10 @@ List<String> buildPlanWarnings({
         'AndroidManifest.xml does not appear to use @style/LaunchTheme.',
       );
     }
+
+    if (_usesDefaultFlutterAndroidLauncherIcon(projectRoot)) {
+      warnings.add(_defaultAndroidLauncherIconWarning);
+    }
   }
 
   if (platforms.ios) {
@@ -477,9 +509,43 @@ List<String> buildPlanWarnings({
     ).existsSync()) {
       warnings.add('iOS Runner project was not found at ios/Runner.');
     }
+
+    if (_usesDefaultFlutterIosAppIcon(projectRoot)) {
+      warnings.add(_defaultIosAppIconWarning);
+    }
   }
 
   return warnings;
+}
+
+bool _usesDefaultFlutterAndroidLauncherIcon(Directory projectRoot) {
+  for (final String relativePath in _androidLauncherIconRelativePaths) {
+    final File iconFile = File(_join(projectRoot.path, relativePath));
+    if (!iconFile.existsSync()) {
+      continue;
+    }
+
+    return _stockFlutterAndroidLauncherIconSha256.contains(
+      _sha256File(iconFile),
+    );
+  }
+
+  return false;
+}
+
+bool _usesDefaultFlutterIosAppIcon(Directory projectRoot) {
+  final File iconFile = File(
+    _join(projectRoot.path, _iosMarketingIconRelativePath),
+  );
+  if (!iconFile.existsSync()) {
+    return false;
+  }
+
+  return _stockFlutterIosMarketingIconSha256.contains(_sha256File(iconFile));
+}
+
+String _sha256File(File file) {
+  return sha256.convert(file.readAsBytesSync()).toString();
 }
 
 NativeLensSplashGenerationResult generateAndroidSplash(
@@ -512,7 +578,7 @@ NativeLensSplashGenerationResult generateAndroidSplash(
     projectRoot,
     timestamp: timestamp,
   );
-  final List<NativeLensSplashBackupEntry> backupEntries = backupSplashFiles(
+  final List<NativeLensBackupEntry> backupEntries = backupSplashFiles(
     projectRoot: projectRoot,
     backupDirectory: backupDirectory,
     files: androidFiles,
@@ -575,7 +641,7 @@ NativeLensSplashGenerationResult generateAndroidSplash(
       generatedFiles.add(entry.key);
     }
   } catch (error) {
-    restoreBackup(
+    restoreNativeLensBackup(
       projectRoot: projectRoot,
       backupDirectory: backupDirectory,
       entries: backupEntries,
@@ -624,7 +690,7 @@ NativeLensSplashGenerationResult generateIosSplash(
     projectRoot,
     timestamp: timestamp,
   );
-  final List<NativeLensSplashBackupEntry> backupEntries = backupSplashFiles(
+  final List<NativeLensBackupEntry> backupEntries = backupSplashFiles(
     projectRoot: projectRoot,
     backupDirectory: backupDirectory,
     files: iosFiles,
@@ -672,7 +738,7 @@ NativeLensSplashGenerationResult generateIosSplash(
       generatedFiles.add(entry.key);
     }
   } catch (error) {
-    restoreBackup(
+    restoreNativeLensBackup(
       projectRoot: projectRoot,
       backupDirectory: backupDirectory,
       entries: backupEntries,
@@ -692,62 +758,26 @@ NativeLensSplashGenerationResult generateIosSplash(
 }
 
 Directory createBackupDirectory(Directory projectRoot, {String? timestamp}) {
-  final String baseTimestamp = timestamp ?? _timestamp();
-  final Directory backupRoot = Directory(
-    _join(projectRoot.path, '.native_lens_backup', 'splash'),
+  return createNativeLensBackupDirectory(
+    projectRoot: projectRoot,
+    toolName: 'splash',
+    timestamp: DateTime.now().toUtc(),
+    timestampName: timestamp,
   );
-
-  var suffix = 0;
-  while (true) {
-    final String directoryName = suffix == 0
-        ? baseTimestamp
-        : '${baseTimestamp}_$suffix';
-    final Directory candidate = Directory(
-      _join(backupRoot.path, directoryName),
-    );
-    if (!candidate.existsSync()) {
-      candidate.createSync(recursive: true);
-      return candidate;
-    }
-    suffix += 1;
-  }
 }
 
-List<NativeLensSplashBackupEntry> backupSplashFiles({
+List<NativeLensBackupEntry> backupSplashFiles({
   required Directory projectRoot,
   required Directory backupDirectory,
   required List<NativeLensSplashFilePlan> files,
 }) {
-  final List<NativeLensSplashBackupEntry> entries =
-      <NativeLensSplashBackupEntry>[];
-
-  for (final NativeLensSplashFilePlan filePlan in files) {
-    final File source = File(_join(projectRoot.path, filePlan.relativePath));
-    if (source.existsSync()) {
-      final File backupFile = File(
-        _join(backupDirectory.path, filePlan.relativePath),
-      );
-      backupFile.parent.createSync(recursive: true);
-      source.copySync(backupFile.path);
-      entries.add(
-        NativeLensSplashBackupEntry(
-          relativePath: filePlan.relativePath,
-          existed: true,
-          backupRelativePath: filePlan.relativePath,
-        ),
-      );
-    } else {
-      entries.add(
-        NativeLensSplashBackupEntry(
-          relativePath: filePlan.relativePath,
-          existed: false,
-          backupRelativePath: null,
-        ),
-      );
-    }
-  }
-
-  return entries;
+  return backupNativeLensFiles(
+    projectRoot: projectRoot,
+    backupDirectory: backupDirectory,
+    relativePaths: files.map(
+      (NativeLensSplashFilePlan filePlan) => filePlan.relativePath,
+    ),
+  );
 }
 
 void writeBackupManifest({
@@ -755,38 +785,16 @@ void writeBackupManifest({
   required String phase,
   required Directory projectRoot,
   required Directory backupDirectory,
-  required List<NativeLensSplashBackupEntry> entries,
+  required List<NativeLensBackupEntry> entries,
 }) {
-  manifestFile.writeAsStringSync(
-    const JsonEncoder.withIndent('  ').convert(<String, Object?>{
-      'tool': 'native_lens:splash',
-      'phase': phase,
-      'projectRoot': projectRoot.path,
-      'backupDirectory': backupDirectory.path,
-      'files': entries
-          .map((NativeLensSplashBackupEntry entry) => entry.toJson())
-          .toList(growable: false),
-    }),
+  writeNativeLensBackupManifest(
+    manifestFile: manifestFile,
+    tool: 'native_lens:splash',
+    phase: phase,
+    projectRoot: projectRoot,
+    backupDirectory: backupDirectory,
+    entries: entries,
   );
-}
-
-void restoreBackup({
-  required Directory projectRoot,
-  required Directory backupDirectory,
-  required List<NativeLensSplashBackupEntry> entries,
-}) {
-  for (final NativeLensSplashBackupEntry entry in entries) {
-    final File target = File(_join(projectRoot.path, entry.relativePath));
-    if (entry.existed) {
-      final File backupFile = File(
-        _join(backupDirectory.path, entry.backupRelativePath!),
-      );
-      target.parent.createSync(recursive: true);
-      backupFile.copySync(target.path);
-    } else if (target.existsSync()) {
-      target.deleteSync();
-    }
-  }
 }
 
 String buildAndroidColorsXml({
@@ -1058,20 +1066,6 @@ String _join(
     ?fifth,
     ?sixth,
   ].join(Platform.pathSeparator);
-}
-
-String _timestamp() {
-  final DateTime now = DateTime.now().toUtc();
-  String twoDigits(int value) => value.toString().padLeft(2, '0');
-  String threeDigits(int value) => value.toString().padLeft(3, '0');
-
-  return '${now.year}'
-      '${twoDigits(now.month)}'
-      '${twoDigits(now.day)}_'
-      '${twoDigits(now.hour)}'
-      '${twoDigits(now.minute)}'
-      '${twoDigits(now.second)}_'
-      '${threeDigits(now.millisecond)}';
 }
 
 String formatSplashPlan(NativeLensSplashPlan plan, {required bool dryRun}) {
